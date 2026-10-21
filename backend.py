@@ -181,11 +181,13 @@ def use(cfg):
 def bind(fn):
     """Inject Gradio's request without adding a user-visible API parameter."""
     sig = inspect.signature(fn)
+    request_index = sum(p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD) for p in sig.parameters.values())
     if inspect.isgeneratorfunction(fn):
         @functools.wraps(fn)
         def wrapped(*args, request=None, **kwargs):
-            if len(args) > len(sig.parameters):
-                args, request = args[:-1], args[-1]
+            if len(args) > request_index and (args[request_index] is None or isinstance(args[request_index], gr.Request)):
+                request = args[request_index]
+                args = args[:request_index] + args[request_index+1:]
             generator = fn(*args, **kwargs)
             while True:
                 with use(_request_config(request)):
@@ -195,15 +197,18 @@ def bind(fn):
     else:
         @functools.wraps(fn)
         def wrapped(*args, request=None, **kwargs):
-            if len(args) > len(sig.parameters):
-                args, request = args[:-1], args[-1]
+            if len(args) > request_index and (args[request_index] is None or isinstance(args[request_index], gr.Request)):
+                request = args[request_index]
+                args = args[:request_index] + args[request_index+1:]
             with use(_request_config(request)):
                 return fn(*args, **kwargs)
     # Gradio injects Request only among positional parameters and reads actual
     # annotations as well as the signature. A keyword-only synthetic parameter
     # silently lost both browser session selection and API BYOK headers.
     wrapped.__annotations__ = {**getattr(fn, '__annotations__', {}), 'request': gr.Request}
-    wrapped.__signature__ = sig.replace(parameters=[*sig.parameters.values(), inspect.Parameter('request', inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=gr.Request, default=None)])
+    parameters = list(sig.parameters.values())
+    parameters.insert(request_index, inspect.Parameter('request', inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=gr.Request, default=None))
+    wrapped.__signature__ = sig.replace(parameters=parameters)
     return wrapped
 
 
