@@ -1,0 +1,3 @@
+-r requirements.txt
+# Spaces supplies Gradio; local installs need it explicitly.
+gradio==6.30.0

@@ -1,0 +1,99 @@
+{
+  "1": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "sharp.mp4"
+    }
+  },
+  "2": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "1",
+        0
+      ]
+    }
+  },
+  "4": {
+    "class_type": "HFRFocusPull",
+    "inputs": {
+      "images": [
+        "2",
+        0
+      ],
+      "depth": [
+        "da3_render",
+        0
+      ],
+      "start_x": 0.2501954652071931,
+      "start_y": 0.44950213371266,
+      "end_x": 0.7498045347928068,
+      "end_y": 0.55049786628734,
+      "blur_strength": 50,
+      "arrival": 0.7777777777777778,
+      "in_between": "stay",
+      "spotlight": 60,
+      "seed": 7,
+      "edge_cleanup": 0.5
+    }
+  },
+  "5": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "4",
+        0
+      ],
+      "fps": 25
+    }
+  },
+  "6": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "5",
+        0
+      ],
+      "filename_prefix": "hero_frame_rig/directed",
+      "format": "mp4",
+      "format.codec": "h264",
+      "format.codec.encoding": "re-encode",
+      "format.codec.encoding.crf": 18
+    }
+  },
+  "da3_model": {
+    "class_type": "LoadDA3Model",
+    "inputs": {
+      "model_name": "depth_anything_3_metric_large.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "da3_infer": {
+    "class_type": "DA3Inference",
+    "inputs": {
+      "da3_model": [
+        "da3_model",
+        0
+      ],
+      "image": [
+        "2",
+        0
+      ],
+      "resolution": 1008,
+      "resize_method": "upper_bound_resize",
+      "mode": "mono"
+    }
+  },
+  "da3_render": {
+    "class_type": "DA3Render",
+    "inputs": {
+      "da3_geometry": [
+        "da3_infer",
+        0
+      ],
+      "output": "depth",
+      "output.normalization": "min_max",
+      "output.apply_sky_clip": false
+    }
+  }
+}

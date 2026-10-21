@@ -1,0 +1,262 @@
+{
+  "audit_date_local": "2026-10-13",
+  "timezone": "America/Chicago",
+  "application_revision": "aab86d0865bb4c607f27727bd534c8cf19659b79",
+  "scope": "Still shoot/scan/develop source inventory; executed saved-take Windows CPU replay and clean installer only. Full local generation, fresh scan and animation unverified.",
+  "verification": "Initial source audit and Digital replay were followed by a clean installer run, two new Cloud Develop controls with CPU grain, and successful local replay of their Film/CineStill exports. Legacy GPU-grain Film/CineStill mismatch remains unresolved; see DESKTOP_REPLAY.md.",
+  "cloud_runtime_revision": null,
+  "cloud_weight_hashes_verified": false,
+  "models": [
+    {
+      "filename": "flux-2-klein-4b.safetensors",
+      "comfy_model_folder": "diffusion_models",
+      "repository": "black-forest-labs/FLUX.2-klein-4B",
+      "revision": "e7b7dc27f91deacad38e78976d1f2b499d76a294",
+      "repository_path": "flux-2-klein-4b.safetensors",
+      "published_sha256": "ec3d4e733a771f61c052fb4856c48b336c55eaf2c65487c2a1faeb9bbda7a343",
+      "size_bytes": 7751105712,
+      "declared_license": "Apache-2.0",
+      "download_url": "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B/resolve/e7b7dc27f91deacad38e78976d1f2b499d76a294/flux-2-klein-4b.safetensors",
+      "metadata_url": "https://huggingface.co/api/models/black-forest-labs/FLUX.2-klein-4B?blobs=true"
+    },
+    {
+      "filename": "qwen_3_4b.safetensors",
+      "comfy_model_folder": "text_encoders",
+      "repository": "Comfy-Org/vae-text-encorder-for-flux-klein-4b",
+      "revision": "5f526678002e43af5551dadb73ce2e8c91b43afe",
+      "repository_path": "split_files/text_encoders/qwen_3_4b.safetensors",
+      "published_sha256": "6c671498573ac2f7a5501502ccce8d2b08ea6ca2f661c458e708f36b36edfc5a",
+      "size_bytes": 8044982048,
+      "declared_license": "Apache-2.0",
+      "download_url": "https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-4b/resolve/5f526678002e43af5551dadb73ce2e8c91b43afe/split_files/text_encoders/qwen_3_4b.safetensors",
+      "metadata_url": "https://huggingface.co/api/models/Comfy-Org/vae-text-encorder-for-flux-klein-4b?blobs=true"
+    },
+    {
+      "filename": "flux2-vae.safetensors",
+      "comfy_model_folder": "vae",
+      "repository": "Comfy-Org/vae-text-encorder-for-flux-klein-4b",
+      "revision": "5f526678002e43af5551dadb73ce2e8c91b43afe",
+      "repository_path": "split_files/vae/flux2-vae.safetensors",
+      "published_sha256": "868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3",
+      "size_bytes": 336211292,
+      "declared_license": "Apache-2.0",
+      "download_url": "https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-4b/resolve/5f526678002e43af5551dadb73ce2e8c91b43afe/split_files/vae/flux2-vae.safetensors",
+      "metadata_url": "https://huggingface.co/api/models/Comfy-Org/vae-text-encorder-for-flux-klein-4b?blobs=true"
+    },
+    {
+      "filename": "depth_anything_3_metric_large.safetensors",
+      "comfy_model_folder": "geometry_estimation",
+      "repository": "Comfy-Org/Depth-Anything-3",
+      "revision": "1aaeea516f22fb2f4c7fae761c8ed470c6cf9f93",
+      "repository_path": "geometry_estimation/depth_anything_3_metric_large.safetensors",
+      "published_sha256": "b6eac00c060931fb15a97c1ba77d2e49d866b83ff7da631289279b3c1c0c99c8",
+      "size_bytes": 1336748056,
+      "declared_license": "Apache-2.0",
+      "download_url": "https://huggingface.co/Comfy-Org/Depth-Anything-3/resolve/1aaeea516f22fb2f4c7fae761c8ed470c6cf9f93/geometry_estimation/depth_anything_3_metric_large.safetensors",
+      "metadata_url": "https://huggingface.co/api/models/Comfy-Org/Depth-Anything-3?blobs=true"
+    },
+    {
+      "filename": "birefnet.safetensors",
+      "comfy_model_folder": "background_removal",
+      "repository": "Comfy-Org/BiRefNet",
+      "revision": "25511f8787e51912e1480706b4e47b8f467fbf72",
+      "repository_path": "background_removal/birefnet.safetensors",
+      "published_sha256": "9ab37426bf4de0567af6b5d21b16151357149139362e6e8992021b8ce356a154",
+      "size_bytes": 444473596,
+      "declared_license": "MIT",
+      "download_url": "https://huggingface.co/Comfy-Org/BiRefNet/resolve/25511f8787e51912e1480706b4e47b8f467fbf72/background_removal/birefnet.safetensors",
+      "metadata_url": "https://huggingface.co/api/models/Comfy-Org/BiRefNet?blobs=true"
+    }
+  ],
+  "runtime_source_references": [
+    {
+      "repository": "https://github.com/Comfy-Org/ComfyUI",
+      "revision": "f9c6185d1acc05e0a01166567c8e292c23e8bd2f",
+      "declared_version": "0.39.0",
+      "license": "GPLv3",
+      "status": "executed saved-take local CPU replay pin; not identified as Cloud revision"
+    },
+    {
+      "repository": "https://github.com/FXTD-Studios/radiance",
+      "revision": "0174a5811b64665714a366b209cfd73d44418e91",
+      "declared_version": "3.5.4",
+      "license": "GPL-3.0-only",
+      "status": "inspected current source; incompatible FilmGrain input schema for existing app graph"
+    },
+    {
+      "repository": "https://github.com/FXTD-Studios/radiance",
+      "revision": "cb7693b76de1d985deb16b3c1ecaff180a04020e",
+      "declared_version": "2.3.3",
+      "license": "GPLv3",
+      "status": "Historical schema-compatible Git candidate inspected only, not installed/executed. Its camera source differs from the tested Registry archive; initial Cloud disc-kernel claim was superseded by actual replay. Use the Registry archive hash and tested dependency overlay."
+    }
+  ],
+  "desktop_replay": {
+    "status": "Clean installer executed; Digital and new CPU-grain Film/CineStill saved-take comparisons passed. Legacy GPU-grain Film/CineStill comparisons failed and remain unresolved.",
+    "comfy_revision": "f9c6185d1acc05e0a01166567c8e292c23e8bd2f",
+    "radiance_registry_version": "2.3.3",
+    "radiance_archive_url": "https://cdn.comfy.org/fxtdstudios/radiance/2.3.3/node.zip",
+    "radiance_archive_sha256": "9d53a1065bd46ab8d4d76b456e89b69c04ff0b9d8ba2fb5cbc71db2debd2fa66",
+    "python": "3.11.1",
+    "platform": "Windows x64",
+    "torch": "2.10.0+cpu",
+    "package_lock": "desktop-requirements-windows-cpu.txt",
+    "cloud_worker_identity_inferred": false,
+    "generation_scan_animation_verified": false,
+    "optics_correction": "Registry2.3.3 approximates every bokeh shape with Gaussian blur; earlier true-disc description is superseded.",
+    "report": "tests/desktop-replay-20261012/DESKTOP_REPLAY_REPORT.md",
+    "processing_policy": {
+      "application_revision": "aab86d0865bb4c607f27727bd534c8cf19659b79",
+      "still_develop_grain_use_gpu": false,
+      "shared_finish_default_grain_use_gpu": true,
+      "video_grain_use_gpu_default": true,
+      "scope": "Only the RadianceFilmGrain backend in new still develop graphs changes. Existing recipes, prior pixels and video defaults retain their settings."
+    },
+    "clean_installer": {
+      "executed": true,
+      "completed_utc": "2026-10-13T05:02:24.9359482Z",
+      "runtime_launched_and_replayed": true,
+      "installer_submits_replay": false,
+      "requirements_sha256": "3545801d1138d5174e1d51a80ccd78e56f59bf46c0aea51351e2686926a0ef1e",
+      "node_source_patches": [],
+      "evidence": "tests/desktop-replay-20261012/installation-pins.json",
+      "setup_log": "tests/desktop-replay-20261012/clean-setup.log"
+    },
+    "comparison_sample_range": [
+      0,
+      255
+    ],
+    "executed_comparisons": [
+      {
+        "case": "Earlier NOLA Digital",
+        "take": 6,
+        "size": [
+          900,
+          1600
+        ],
+        "pixel_exact": false,
+        "within_tolerance": true,
+        "mae": 4.398148148148148e-06,
+        "max_abs": 1.0,
+        "changed_pixels": 19,
+        "comparison_evidence": "tests/desktop-replay-20261012/clean-runner-nola/comparison.json",
+        "execution_evidence": "tests/desktop-replay-20261012/clean-runner-nola/run.json"
+      },
+      {
+        "case": "Original Product Digital",
+        "take": 1,
+        "size": [
+          1344,
+          768
+        ],
+        "pixel_exact": false,
+        "within_tolerance": true,
+        "mae": 2.583498677248677e-06,
+        "max_abs": 1.0,
+        "changed_pixels": 8,
+        "comparison_evidence": "tests/desktop-replay-20261012/product-digital/comparison.json",
+        "execution_evidence": "tests/desktop-replay-20261012/product-digital/execution.json"
+      },
+      {
+        "case": "New NOLA CPU-grain Film",
+        "take": 6,
+        "size": [
+          900,
+          1600
+        ],
+        "pixel_exact": false,
+        "within_tolerance": true,
+        "mae": 7.083333333333334e-05,
+        "max_abs": 1.0,
+        "changed_pixels": 304,
+        "comparison_evidence": "tests/desktop-replay-20261012/clean-runner-cpu-film/comparison.json",
+        "execution_evidence": "tests/desktop-replay-20261012/clean-runner-cpu-film/run.json"
+      },
+      {
+        "case": "New NOLA CPU-grain CineStill",
+        "take": 7,
+        "size": [
+          900,
+          1600
+        ],
+        "pixel_exact": false,
+        "within_tolerance": true,
+        "mae": 8.055555555555556e-05,
+        "max_abs": 1.0,
+        "changed_pixels": 348,
+        "comparison_evidence": "tests/desktop-replay-20261012/clean-runner-cpu-cinestill/comparison.json",
+        "execution_evidence": "tests/desktop-replay-20261012/clean-runner-cpu-cinestill/run.json"
+      },
+      {
+        "case": "Legacy Product GPU-grain Film",
+        "take": 3,
+        "size": [
+          1344,
+          768
+        ],
+        "pixel_exact": false,
+        "within_tolerance": false,
+        "mae": 0.11364584625082672,
+        "max_abs": 16.0,
+        "changed_pixels": 225323,
+        "comparison_evidence": "tests/desktop-replay-20261012/clean-runner-legacy-film/comparison.json",
+        "execution_evidence": "tests/desktop-replay-20261012/clean-runner-legacy-film/run.json"
+      },
+      {
+        "case": "Legacy Product GPU-grain CineStill",
+        "take": 4,
+        "size": [
+          1344,
+          768
+        ],
+        "pixel_exact": false,
+        "within_tolerance": false,
+        "mae": 0.121510662099041,
+        "max_abs": 15.0,
+        "changed_pixels": 253710,
+        "comparison_evidence": "tests/desktop-replay-20261012/product-cinestill/comparison.json",
+        "execution_evidence": "tests/desktop-replay-20261012/product-cinestill/execution.json"
+      }
+    ],
+    "legacy_gpu_grain_mismatch": {
+      "resolved": false,
+      "historical_graphs_preserved": true,
+      "diagnostic_conclusion": "Standalone grain checks using an already-developed fixture did not reproduce the historical Cloud mismatch; they are not full recipe replay or exact pre-grain-tensor comparisons.",
+      "diagnostic_evidence": "tests/desktop-replay-20261012/grain-diagnostic/README.md",
+      "full_gpu_recipe_parity_verified": false
+    }
+  },
+  "initial_audit_application_revision": "740392f22e6c88279c6ed57abdad02b49ea8da98",
+  "initial_replay_application_revision": "a17d580e",
+  "public_release_authorized": false,
+  "publication_boundary": "Keep the Space, source, research and demo assets private until Maxwell explicitly authorizes public release/submission.",
+  "cloud_cpu_still_validation": {
+    "application_revision": "aab86d0865bb4c607f27727bd534c8cf19659b79",
+    "develop_jobs": 2,
+    "shoot_jobs": 0,
+    "scan_jobs": 0,
+    "animation_jobs": 0,
+    "model_weights_downloaded": false,
+    "actual_billed_credits": "unavailable",
+    "evidence": "tests/desktop-replay-20261012/cloud-cpu-looks/results.json",
+    "jobs": [
+      {
+        "look": "film",
+        "take": 6,
+        "job_id": "dcdd908e-f5b7-40cf-8ca2-e031126bd423",
+        "grain_use_gpu": false,
+        "layered": true,
+        "previous_assets_unchanged": true
+      },
+      {
+        "look": "cinestill",
+        "take": 7,
+        "job_id": "86e5bdda-126b-432f-a393-76330c37b0eb",
+        "grain_use_gpu": false,
+        "layered": true,
+        "previous_assets_unchanged": true
+      }
+    ],
+    "initial_replay_phase_cloud_jobs": 0
+  }
+}
