@@ -1,0 +1,70 @@
+{
+  "1": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "sharp.mp4"
+    }
+  },
+  "2": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "1",
+        0
+      ]
+    }
+  },
+  "3": {
+    "class_type": "HFRLoadDepthBatch",
+    "inputs": {
+      "file": "hfr_depth.npz"
+    }
+  },
+  "4": {
+    "class_type": "HFRFocusPull",
+    "inputs": {
+      "images": [
+        "2",
+        0
+      ],
+      "depth": [
+        "3",
+        0
+      ],
+      "start_x": 0.2501954652071931,
+      "start_y": 0.44950213371266,
+      "end_x": 0.7498045347928068,
+      "end_y": 0.55049786628734,
+      "blur_strength": 50,
+      "arrival": 0.7777777777777778,
+      "in_between": "stay",
+      "spotlight": 60,
+      "seed": 7,
+      "edge_cleanup": 0.5
+    }
+  },
+  "5": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "4",
+        0
+      ],
+      "fps": 25
+    }
+  },
+  "6": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "5",
+        0
+      ],
+      "filename_prefix": "hero_frame_rig/directed",
+      "format": "mp4",
+      "format.codec": "h264",
+      "format.codec.encoding": "re-encode",
+      "format.codec.encoding.crf": 18
+    }
+  }
+}
