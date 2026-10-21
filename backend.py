@@ -184,6 +184,8 @@ def bind(fn):
     if inspect.isgeneratorfunction(fn):
         @functools.wraps(fn)
         def wrapped(*args, request=None, **kwargs):
+            if len(args) > len(sig.parameters):
+                args, request = args[:-1], args[-1]
             generator = fn(*args, **kwargs)
             while True:
                 with use(_request_config(request)):
@@ -193,9 +195,15 @@ def bind(fn):
     else:
         @functools.wraps(fn)
         def wrapped(*args, request=None, **kwargs):
+            if len(args) > len(sig.parameters):
+                args, request = args[:-1], args[-1]
             with use(_request_config(request)):
                 return fn(*args, **kwargs)
-    wrapped.__signature__ = sig.replace(parameters=[*sig.parameters.values(), inspect.Parameter('request', inspect.Parameter.KEYWORD_ONLY, annotation=gr.Request, default=None)])
+    # Gradio injects Request only among positional parameters and reads actual
+    # annotations as well as the signature. A keyword-only synthetic parameter
+    # silently lost both browser session selection and API BYOK headers.
+    wrapped.__annotations__ = {**getattr(fn, '__annotations__', {}), 'request': gr.Request}
+    wrapped.__signature__ = sig.replace(parameters=[*sig.parameters.values(), inspect.Parameter('request', inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=gr.Request, default=None)])
     return wrapped
 
 
