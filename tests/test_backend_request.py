@@ -32,4 +32,10 @@ class RequestInjection(unittest.TestCase):
             self.assertNotEqual(backend.config()['key'],'test-only-key')
         finally:backend._sessions.pop('test',None)
 
+    def test_variadic_ui_handler_keeps_all_inputs(self):
+        @backend.bind
+        def call(*values):return values,backend.config()['key']
+        args,*_=special_args(call,['a','b'],request=self.request())
+        self.assertEqual(call(*args),(('a','b'),'test-only-key'))
+
 if __name__=='__main__':unittest.main()
