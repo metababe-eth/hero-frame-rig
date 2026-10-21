@@ -193,6 +193,5 @@ See [the detailed licence list](MODEL_LICENSES.md) for text encoders, VAEs, matt
 model and runtime dependencies. Open weights does not mean every model is under
 an OSI open-source licence. No weights or runtime binaries are redistributed.
 
-Release is **prepared, not authorized or published**. [Checklist](RELEASE_CHECKLIST.md),
-[submission draft](SUBMISSION_DRAFT.md), and [social drafts](SOCIAL_POST_DRAFT.md)
-are review material for Maxwell.
+This code-only release candidate is private while the maintainer reviews deployment
+and the demo. No sample media or owner credentials are bundled.
