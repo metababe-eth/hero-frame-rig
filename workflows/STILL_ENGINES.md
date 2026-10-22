@@ -1,24 +1,29 @@
-# Still-engine source and adaptation
+# Still engines and runtime discovery
 
-Retrieved 2026-10-20 from the official Comfy-Org workflow templates:
+FLUX 3 is adapted from the fresh official Comfy-Org
+[distilled template](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/image_flux3_klein_distilled_t2i.json),
+retrieved and executed on 2026-10-21 with ComfyUI v0.42.3. It uses
+`flux3-image-klein-int8-convrot.safetensors`, Qwen3-VL 4B INT8, FLUX.2 VAE,
+16 Euler/simple steps, CFG 1. No partner generation node is present.
 
-- [FLUX 3 Image Klein distilled](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/image_flux3_klein_distilled_t2i.json)
-- [MOSS-Image](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/image_moss_image_t2i.json)
-- FLUX.2 Klein 4B: existing `rig_workflow._shoot_nodes` generation branch, unchanged.
+Default expansion uses the core TextGenerate node and
+`qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors`. BFL's Apache-2.0 `t2i`
+system prompt is loaded from its PUP repository at runtime, then the rig appends
+style/deep-focus/distance/no-brand constraints. It is not copied into this source
+repository. Each executed graph retains the exact fetched text for replay.
+The API PNG includes original prompt, actual expanded caption when available,
+seed, dimensions, model, job and graph. The UI recipe retains the same information.
 
-`still_engines.py` flattens the first two templates into small API graphs. It
-omits the optional prompt upsampler, keeping `/shoot_still`'s verbatim prompt
-contract. MOSS's optional skip-layer guidance is off, matching the template's
-false switch. FLUX 3 distilled uses 16 Euler/simple steps, CFG 1; MOSS uses
-25 er_sde/simple steps, CFG 2.5 and the template's negative prompt. No API,
-partner or Router node is present.
+Cloud's object_info loader enums were a false negative for this executed model.
+Backend discovery supplements them with live `/api/assets` loader paths for
+FLUX 3 and its encoder, while still checking required core classes and CLIP type.
+A catalogue entry is discovery evidence, not proof that every variant executes.
+Local discovery still requires the installed loader names; no weights download
+occurs when selecting an engine. Auto chooses the first available engine, FLUX 3
+then MOSS then Klein 4B. Explicit Klein 4B remains selectable.
 
-Availability requires the actual UNET, CLIP and VAE filenames, CLIP type and
-graph node classes to appear in the selected backend's object_info. Subfolders
-are accepted; the matching full path is used. FLUX 3 is the UI's first choice
-when available. `engine=auto` preserves Klein 4B on Cloud and chooses the first
-installed engine locally. Explicit unavailable selections fail before submission.
-
-Model names are not weights: no models are installed or downloaded by selecting
-an engine. The standalone focus pack is MIT; the app remains Apache-2.0. Model
-and third-party node licenses apply separately.
+UI FLUX 3 default is 2K area (2768x1520); 1K is 1376x752. API dimensions are
+explicit and bounded. MOSS's optional SLG remains off and its generation has not
+been tested. Its prepared graph uses 25 er_sde/simple steps and CFG 2.5.
+Klein 4B's original generation graph is unchanged. The standalone focus pack is
+MIT; app code is Apache-2.0; model licences are separate (MODEL_LICENSES.md).
