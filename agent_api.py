@@ -134,8 +134,11 @@ class AgentAPI:
         height = bounded('height', height, 256, 4096, integer=True)
         if width % 16 or height % 16 or width * height > 4300000:
             raise gr.Error('Dimensions must be multiples of 16 with at most 4300000 total pixels.')
-        graph, engine = still_engines.graph(prompt, seed, width, height, engine,
-            backend.object_info(), backend.config()['kind'], expand_prompt=expand_prompt)
+        try:
+            graph, engine = still_engines.graph(prompt, seed, width, height, engine,
+                backend.object_info(), backend.config()['kind'], expand_prompt=expand_prompt)
+        except ValueError as exc:
+            raise gr.Error(str(exc)) from None
         directory = Path(tempfile.mkdtemp(prefix='rig_agent_still_'))
         receipt = {'kind': 'shoot_still', 'status': 'reserved', 'prompt': prompt,
                    'seed': seed, 'width': width, 'height': height, 'engine': engine,
