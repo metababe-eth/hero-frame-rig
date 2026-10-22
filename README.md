@@ -103,16 +103,27 @@ The app and nodes import the same `hfr_core`; no duplicate renderer is maintaine
 
 ## Still engines: what runs where
 
-| Engine | Local ComfyUI | Comfy Cloud in the last verified inventory (20 October 2026) |
+| Engine | Local ComfyUI | Comfy Cloud |
 | --- | --- | --- |
-| FLUX 3 Image Klein, distilled | Graph prepared; enabled only when all weights/nodes exist. No local generation validation yet. First UI choice when available. | Awaiting matching Cloud weights/support; disabled. |
-| MOSS-Image SFT | Graph prepared; enabled only with all weights/nodes. No local generation validation yet. | Awaiting matching Cloud weights/support; disabled. |
-| FLUX.2 Klein 4B | Supported when installed. | Executed and checked; `engine=auto` keeps this fallback. |
+| FLUX 3 Image Klein, distilled | Enabled with installed weights/core nodes. Local generation not yet validated. | Core-node execution confirmed 21 October 2026. Default when available. |
+| MOSS-Image SFT | Enabled with installed weights/core nodes. Local generation not yet validated. | Execution unconfirmed; no unavailable claim from schema omission alone. |
+| FLUX.2 Klein 4B | Supported when installed. | Executed and checked; selectable fallback. |
 
-Refresh checks the selected backend's actual inventory. FLUX 3 and MOSS are not
-represented as successful generations by a disabled button. The prompt passes
-verbatim; FLUX 3's upstream recommends expanded scene captions, so supply a full
-caption rather than assuming a hidden prompt-enhancement model.
+Cloud discovery checks both the live model asset catalogue and node schema;
+Cloud's loader dropdown enums alone can omit executable models. Discovery is
+not an execution guarantee. A failed job is never automatically resubmitted.
+
+FLUX 3 Shoot defaults to **2K area** (2768x1520 widescreen), with a **1K** option
+(1376x752). Expand prompt runs the open-weight BFL caption model in the same job,
+using its runtime-fetched t2i instructions plus deep-focus, style, distance and
+no-brand rules. Turn it off to supply your own caption verbatim. Klein 4B remains
+selectable and keeps the existing UI generation size. The user request, actual
+expanded caption when returned by history, model files and graph are preserved
+in the recipe/API PNG. Missing caption weights fail before submission with an
+explicit suggestion to turn expansion off; there is no silent hosted LLM fallback.
+The caption model can still change composition or ignore constraints, including
+text suppression. Review the result; use a supplied caption with expansion off
+when exact wording matters. Deep focus in a prompt is not a sharpness guarantee.
 
 ## Agent API
 
@@ -145,10 +156,12 @@ The upload path takes the first 97 frames at 25 fps (3.88 seconds), preserves as
 within 1280 pixels / 901120 pixels total, does not upscale, and removes audio.
 Share plays the comparison twice and crops around the end focus point.
 
-`/shoot_still`: prompt, optional seed=1102, width=1344, height=768, engine='auto'
-(`flux3`/`moss`/`klein4b`). Returns a PNG. Dimensions must be multiples of 16,
-256–1536 per side, at most 1048576 pixels total. Local auto chooses the first
-installed engine. Explicit unavailable engines fail before submission.
+`/shoot_still`: prompt, optional seed=1102, width=2768, height=1520, engine='auto'
+(`flux3`/`moss`/`klein4b`), expand_prompt=True. Returns a PNG with embedded
+provenance. Explicit smaller dimensions such as 1280x704 remain supported.
+Dimensions must be multiples of 16, 256–4096 per side, at most 4300000 pixels.
+Auto prefers FLUX 3 when found. Expansion applies only to FLUX 3; set it False
+for verbatim conditioning. Explicit unavailable engines fail before submission.
 
 ## Replay and limits
 
@@ -180,7 +193,8 @@ Only media explicitly selected by Maxwell should be published.
 
 | Model or dependency | Licence | Role |
 | --- | --- | --- |
-| [FLUX 3 Image Klein](https://huggingface.co/black-forest-labs/flux-3-image-klein) | FLUX Kommunity License v1.0, custom terms | Optional prepared still engine; not yet run here |
+| [FLUX 3 Image Klein](https://huggingface.co/black-forest-labs/flux-3-image-klein) | FLUX Kommunity License v1.0, custom terms | Default available still engine; executed on Cloud |
+| [FLUX 3 prompt upsampler](https://huggingface.co/black-forest-labs/flux-3-image-klein-pup) | Apache-2.0 | Optional open-weight caption expansion; system text fetched at runtime |
 | [MOSS-Image SFT](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT) | Apache-2.0 | Optional prepared still engine |
 | [FLUX.2 Klein 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) | Apache-2.0 | Executed still engine |
 | [LTX-2.3](https://huggingface.co/Lightricks/LTX-2.3/blob/main/LICENSE) | LTX-2 Community License Agreement, custom terms | Core motion model |

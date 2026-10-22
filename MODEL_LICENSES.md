@@ -16,6 +16,7 @@ relicense them. Nothing in this document is a release approval.
 | BiRefNet | MIT | [Upstream](https://huggingface.co/ZhengPeng7/BiRefNet), [Comfy repack](https://huggingface.co/Comfy-Org/BiRefNet). Matte, not face recognition. |
 | Qwen3-4B and Qwen3-VL-4B-Instruct | Apache-2.0 | [Qwen3](https://huggingface.co/Qwen/Qwen3-4B), [Qwen3-VL](https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct). FLUX prompt encoders. |
 | Qwen3.5-9B | Apache-2.0 | [Qwen](https://huggingface.co/Qwen/Qwen3.5-9B). MOSS encoder; quantized repack separately identified in the engine guide. |
+| FLUX 3 Klein prompt upsampler and system instructions | Apache-2.0 per BFL | [BFL PUP](https://huggingface.co/black-forest-labs/flux-3-image-klein-pup). Uses `qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors` on Cloud. The `t2i` system prompt is fetched at runtime; the exact instructions and rig additions travel in the saved graph. |
 | FLUX.2 VAE / MOSS small VAE repacks | Apache-2.0 declared by those repacks | [Klein repack](https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-4b), [MOSS repack](https://huggingface.co/Comfy-Org/MOSS-Image). FLUX 3 package terms remain its own. |
 | Gemma 3 12B encoder for LTX | Gemma Terms of Use | [Gemma card](https://huggingface.co/google/gemma-3-12b-it), [terms](https://ai.google.dev/gemma/terms). Custom terms, not Apache-2.0. |
 | comfy-sdk / comfy-python-sdk | MIT | [Licence](https://github.com/Comfy-Org/comfy-python-sdk/blob/main/LICENSE). Installed separately. |
@@ -31,3 +32,7 @@ FFmpeg executable is distributed. Consult the installed distributions' notices.
 Maxwell retains his art and creative direction. CC0 source references do not
 automatically make every remix or every asset in an archive CC0. Historical private
 Space test assets are not approved for public release by this code change.
+
+FLUX and Black Forest Labs names identify third-party models; they do not imply
+endorsement of Hero Frame Rig. Model weight terms are separate from the app's
+Apache-2.0 code and the focus pack's MIT code.

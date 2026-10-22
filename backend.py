@@ -79,7 +79,43 @@ def object_info(cfg=None):
     data = r.json()
     if not isinstance(data, dict) or 'UNETLoader' not in data:
         raise ValueError('Backend did not return ComfyUI node and model information.')
+    if cfg['kind'] == CLOUD:
+        # Cloud's object_info enums omit some executable asset-library models.
+        # Preserve that schema; supply a separate live catalogue for discovery.
+        catalogue = []
+        for term in ('flux3', 'qwen3vl_4b'):
+            try:
+                assets = httpx.get('https://cloud.comfy.org/api/assets', headers=headers,
+                    params={'include_tags': 'models', 'include_public': 'true',
+                            'name_contains': term, 'limit': 100}, timeout=20)
+                assets.raise_for_status()
+                catalogue.extend({'path': a.get('loader_path') or a.get('name'),
+                                  'tags': a.get('tags', [])}
+                                 for a in assets.json().get('assets', []))
+            except (httpx.HTTPError, ValueError):
+                # Existing loader inventory remains usable; do not invent files.
+                continue
+        data['_hfr_cloud_catalogue'] = catalogue
     return data
+
+
+def expanded_caption(job_id):
+    """Read only the caption preview after a completed job; never return auth data."""
+    cfg = config()
+    if cfg['kind'] == CLOUD:
+        base, headers = 'https://cloud.comfy.org/api', {'X-API-Key': cloud_key(cfg)}
+    else:
+        base, headers = local_url(cfg), {}
+    try:
+        history = '/history_v2/' if cfg['kind'] == CLOUD else '/history/'
+        r = httpx.get(base + history + str(job_id), headers=headers, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        record = data.get(str(job_id), data)
+        text = record.get('outputs', {}).get('103', {}).get('text', [])
+        return text[0] if text and isinstance(text[0], str) else None
+    except (httpx.HTTPError, ValueError, TypeError):
+        return None
 
 
 def _proxy(url):

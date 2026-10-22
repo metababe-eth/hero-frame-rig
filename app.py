@@ -416,7 +416,7 @@ def gallery_select(state, evt: gr.SelectData):
         raise gr.Error("Choose one of the saved takes.")
     return choose_take(state, takes[index]["n"])
 
-def shoot(scene, shot, lens, f_stop, stock, mode, hold, seed, guide=0, engine="auto"):
+def shoot(scene, shot, lens, f_stop, stock, mode, hold, seed, guide=0, engine="auto", resolution="2K", expand_prompt=True):
     guide = rig.guide_eye.amount(guide)
     if not scene.strip():
         raise gr.Error("Describe the scene first.")
@@ -425,8 +425,11 @@ def shoot(scene, shot, lens, f_stop, stock, mode, hold, seed, guide=0, engine="a
         prompt = rig.shot_prompt(scene, shot)
     else:
         prompt = rig.build_prompt(scene, int(lens))
-    graph, selected_engine = still_engines.graph(prompt, int(seed), 1344, 768, engine,
-        backend.object_info(), backend.config()['kind'], analysis=True)
+    info, kind = backend.object_info(), backend.config()['kind']
+    selected_engine, _ = still_engines.resolve(engine, info, kind)
+    width, height = still_engines.canvas(resolution) if selected_engine == 'flux3' else (1344, 768)
+    graph, selected_engine = still_engines.graph(prompt, int(seed), width, height, selected_engine,
+        info, kind, analysis=True, expand_prompt=expand_prompt)
     with _client() as client:
         directory = tempfile.mkdtemp(prefix="rig_frame_")
         result = _run(client, client.workflows.from_json(copy.deepcopy(graph)), "shoot")
@@ -434,7 +437,10 @@ def shoot(scene, shot, lens, f_stop, stock, mode, hold, seed, guide=0, engine="a
             (rig.STILL_NODE, "still.png"), (rig.DEPTH_NODE, "depth.exr"),
             (rig.SKY_NODE, "sky.png"), (rig.MATTE_NODE, "subject_matte.png"))]
         meta = {"source": "generated", "scene": scene.strip(), "shot": shot,
-                "seed": int(seed), "engine": selected_engine, "prompt": graph["4"]["inputs"]["text"],
+                "seed": int(seed), "engine": selected_engine, "prompt": prompt,
+                "expanded_prompt": backend.expanded_caption(result.id) if '102' in graph else None,
+                "prompt_system_source": still_engines.PUP_SOURCE if '102' in graph else None,
+                "resolution": resolution, "width": width, "height": height,
                 "frame_graph": graph, "frame_job": result.id}
         state = _frame_state(directory, *files, lens, meta)
         state = _develop(client, state, [(f_stop, stock, mode)], hold, guide)
@@ -531,6 +537,8 @@ def save_recipe(state):
         "provenance": {**provenance.capture(), "source_study": state.get("study")},
         "frame": {"source": state["source"], "shot": state.get("shot"),
                   "scene": state.get("scene"), "prompt": state.get("prompt"),
+                  "engine": state.get("engine"), "expanded_prompt": state.get("expanded_prompt"),
+                  "prompt_system_source": state.get("prompt_system_source"),
                   "seed": state.get("seed"), "lens_mm_full_frame": state["lens"],
                   "size": [state["width"], state["height"]], "cloud_job": state["frame_job"],
                   "provenance": state.get("frame_provenance", {
@@ -542,8 +550,10 @@ def save_recipe(state):
                    "z_near_m": state["z_near"], "cinematic_multiplier": round(state["cine"], 2),
                    "disparity": "D = z_near / z (near is bright)",
                    "blur": "CoC radius px = B * |D - D_focus|, B = f^2 W / (2 N 36mm z_near)"},
-        "models": {"image": "FLUX.2 [klein] 4B (flux-2-klein-4b.safetensors, Apache 2.0)",
-                   "text_encoder": "qwen_3_4b.safetensors", "vae": "flux2-vae.safetensors",
+        "models": {"image": state.get("frame_graph", {}).get("1", {}).get("inputs", {}).get("unet_name"),
+                   "text_encoder": state.get("frame_graph", {}).get("2", {}).get("inputs", {}).get("clip_name"),
+                   "prompt_upsampler": state.get("frame_graph", {}).get("101", {}).get("inputs", {}).get("clip_name"),
+                   "vae": state.get("frame_graph", {}).get("3", {}).get("inputs", {}).get("vae_name"),
                    "depth": rig.METRIC_MODEL, "subject_matte": "birefnet.safetensors (MIT)"},
         "takes": takes,
     }
@@ -1017,7 +1027,10 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
                         engine_selected = gr.Markdown("**Still engine:** checking availability")
                         with gr.Row(elem_id="engine-picker"):
                             engine_buttons = [gr.Button(v['label'], interactive=False) for v in still_engines.ENGINES.values()]
-                        engine_status = gr.Markdown("Connect a backend to inspect its loader model lists.")
+                        engine_status = gr.Markdown("Connect a backend to check available models.")
+                        with gr.Row():
+                            still_resolution = gr.Radio(['2K', '1K'], value='2K', label='FLUX 3 size')
+                            expand_prompt = gr.Checkbox(value=True, label='Expand prompt for FLUX 3', info='Keeps your style and depth instructions. Turn off to use your own full caption.')
                         scene = gr.Textbox(label="Scene", lines=2, placeholder="A street musician under the French Quarter gas lamps…")
                         with gr.Row():
                             seed = gr.Number(value=1102, precision=0, label="Seed", scale=1)
@@ -1109,7 +1122,7 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
     shot.input(shot_changed, shot, [lens, f_stop], api_visibility="private")
     lens.input(lambda: ANY_LENS, None, shot, api_visibility="private")
     upload.change(lambda path: path, upload, upload_preview, queue=False, api_visibility="private")
-    shoot_btn.click(shoot, [scene, shot, lens, f_stop, stock, mode, hold, seed, guide, engine], outs, **queue)
+    shoot_btn.click(shoot, [scene, shot, lens, f_stop, stock, mode, hold, seed, guide, engine, still_resolution, expand_prompt], outs, **queue)
     bring_btn.click(bring_frame, [upload, lens, f_stop, stock, mode, hold, guide], outs, **queue)
     develop_btn.click(develop, [state, f_stop, stock, mode, hold, guide], outs, **queue)
     hero.select(focus_stage_click, [state, f_stop, stock, mode, hold, stage_view, guide], outs, **queue)

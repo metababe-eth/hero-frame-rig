@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 import gradio as gr
+from PIL import Image, PngImagePlugin
 import clip_flow
 import clip_focus
 import clip_share
@@ -111,29 +112,35 @@ class AgentAPI:
 
     @backend.bind
     def shoot_still(self, prompt: str, seed: int = 1102,
-                    width: int = 1344, height: int = 768, engine: str = 'auto') -> str:
+                    width: int = 2768, height: int = 1520, engine: str = 'auto',
+                    expand_prompt: bool = True) -> str:
         """Generate one PNG with an open-weight model using exactly 1 Comfy job.
-        engine: auto (Klein 4B on Cloud; first installed engine locally), flux3, moss,
+        engine: auto (first available engine, preferring FLUX 3), flux3, moss,
         klein4b. Explicit unavailable engines fail before any job is submitted.
-        prompt is used verbatim; no lens words or shot preset are added. No depth,
+        FLUX 3 expands the prompt with BFL's open-weight caption model plus deep-focus,
+        style and distance rules. Set expand_prompt=False for verbatim conditioning.
+        Other engines use the prompt verbatim. No lens words or shot preset are added. No depth,
         matte, focus treatment or animation is run. No previous UI session is needed.
         seed defaults to 1102 and must be an integer in 0–4294967295. Dimensions
-        default to 1344x768; each must be 256–1536 and a multiple of 16, with at
-        most 1048576 total pixels. Returns a PNG whose filename includes its job ID.
+        default to 2768x1520 (2K area); each must be 256–4096 and a multiple of 16,
+        with at most 4300000 total pixels. Explicit smaller dimensions remain supported.
+        Returns a PNG with its job ID, original prompt, graph and caption metadata.
         Invalid inputs fail before submission; failures never automatically retry.
         """
         if not isinstance(prompt, str) or not prompt.strip():
             raise gr.Error('prompt must contain a scene description.')
         seed = bounded('seed', seed, 0, 4294967295, integer=True)
-        width = bounded('width', width, 256, 1536, integer=True)
-        height = bounded('height', height, 256, 1536, integer=True)
-        if width % 16 or height % 16 or width * height > 1048576:
-            raise gr.Error('Dimensions must be multiples of 16 with at most 1048576 total pixels.')
+        width = bounded('width', width, 256, 4096, integer=True)
+        height = bounded('height', height, 256, 4096, integer=True)
+        if width % 16 or height % 16 or width * height > 4300000:
+            raise gr.Error('Dimensions must be multiples of 16 with at most 4300000 total pixels.')
         graph, engine = still_engines.graph(prompt, seed, width, height, engine,
-            backend.object_info(), backend.config()['kind'])
+            backend.object_info(), backend.config()['kind'], expand_prompt=expand_prompt)
         directory = Path(tempfile.mkdtemp(prefix='rig_agent_still_'))
         receipt = {'kind': 'shoot_still', 'status': 'reserved', 'prompt': prompt,
-                   'seed': seed, 'width': width, 'height': height, 'engine': engine}
+                   'seed': seed, 'width': width, 'height': height, 'engine': engine,
+                   'expand_prompt': bool(engine == 'flux3' and expand_prompt),
+                   'prompt_system_source': still_engines.PUP_SOURCE if engine == 'flux3' and expand_prompt else None}
         def save():
             (directory / 'receipt.json').write_text(json.dumps(receipt, indent=2), encoding='utf-8')
         save()
@@ -146,7 +153,18 @@ class AgentAPI:
                 result = job.result()
                 target = directory / f'still_{job.id}.png'
                 result.get_outputs(rig_workflow.STILL_NODE)[0].to_file(str(target))
-                receipt['status'] = 'succeeded'; save()
+                receipt['status'] = 'succeeded'
+                receipt['expanded_prompt'] = backend.expanded_caption(job.id) if '102' in graph else None
+                save()
+                # Portable still provenance without changing PNG pixels or API output shape.
+                with Image.open(target) as im:
+                    metadata = PngImagePlugin.PngInfo()
+                    for key, value in im.info.items():
+                        if isinstance(value, str): metadata.add_text(key, value)
+                    metadata.add_text('hero_frame_rig', json.dumps({'receipt': receipt, 'graph': graph}))
+                    annotated = directory / 'annotated.png'
+                    im.save(annotated, pnginfo=metadata)
+                annotated.replace(target)
             return str(target)
         except Exception as exc:
             receipt['status'] = 'needs_recovery'; save()
@@ -170,9 +188,10 @@ def register(client_factory):
             [video, *coords, middle, blur, arrival, spotlight, edge_cleanup], result, api_name='direct_clip', **queue)
         prompt = gr.Textbox(label='prompt')
         seed = gr.Number(value=1102, label='seed')
-        width = gr.Number(value=1344, label='width')
-        height = gr.Number(value=768, label='height')
+        width = gr.Number(value=2768, label='width')
+        height = gr.Number(value=1520, label='height')
         engine = gr.Textbox(value='auto', label='engine')
+        expand_prompt = gr.Checkbox(value=True, label='expand_prompt')
         png = gr.File(label='png')
-        gr.Button('API shoot').click(endpoints.shoot_still, [prompt, seed, width, height, engine],
+        gr.Button('API shoot').click(endpoints.shoot_still, [prompt, seed, width, height, engine, expand_prompt],
                                     png, api_name='shoot_still', **queue)

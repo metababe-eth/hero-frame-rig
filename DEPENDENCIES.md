@@ -1,3 +1,12 @@
+# Current Shoot additions — 2026-10-21
+
+FLUX 3 Image Klein distilled now uses core Cloud nodes with the current hyphenated
+INT8 checkpoint, Qwen3-VL 4B INT8 encoder, FLUX.2 VAE and optional W4A8 BFL prompt
+upsampler. See MODEL_LICENSES.md and workflows/STILL_ENGINES.md for exact files,
+terms and runtime caption source. Local and Cloud routing uses backend.py; older
+statements below about mandatory global credentials or Klein-only generation are
+historical. No new Python dependency or packaged model weight is added.
+
 # Still-workflow dependencies and replay status
 
 Audit and desktop replay: 2026-10-12–13, America/Chicago. Initial source review: `740392f22e6c88279c6ed57abdad02b49ea8da98`; initial replay used recipes exported by application `a17d580e`. Current private deployment: `aab86d0865bb4c607f27727bd534c8cf19659b79`. Scope: the still-workflow source inventory, app preprocessing, and executed saved-take replay. The initial source audit installed nothing; the first replay phase installed an isolated Windows CPU runtime and used no model weights or Cloud jobs. The Oct 13 follow-up ran the clean installer and exactly two Cloud **Develop** jobs for new CPU-grain Film/CineStill references, followed by local replay. It ran no Shoot, Scan or animation jobs and downloaded no model weights; billed credits were unavailable. Animation is separately documented in `ANIMATION_HANDOFF.md`.
