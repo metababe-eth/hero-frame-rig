@@ -106,14 +106,17 @@ The app and nodes import the same `hfr_core`; no duplicate renderer is maintaine
 | Engine | Local ComfyUI | Comfy Cloud |
 | --- | --- | --- |
 | FLUX 3 Image Klein, distilled | Enabled with installed weights/core nodes. Local generation not yet validated. | Core-node execution confirmed 21 October 2026. Default when available. |
-| MOSS-Image SFT | Enabled with installed weights/core nodes. Local generation not yet validated. | Execution unconfirmed; no unavailable claim from schema omission alone. |
+| MOSS-Image SFT | Enabled with installed weights/core nodes. Local generation not yet validated. | Core-node execution confirmed 21 October 2026, including 2K Shoot, analysis, development and recipe. |
 | FLUX.2 Klein 4B | Supported when installed. | Executed and checked; selectable fallback. |
 
 Cloud discovery checks both the live model asset catalogue and node schema;
-Cloud's loader dropdown enums alone can omit executable models. Discovery is
-not an execution guarantee. A failed job is never automatically resubmitted.
+Cloud's loader dropdown enums alone can omit executable models. Model filenames
+come from current official Comfy-Org templates, refreshed hourly; local discovery
+uses the dated bundled template snapshot against only that server's inventory.
+A failed template refresh disables that engine until discovery succeeds. Discovery
+is not an execution guarantee. A failed job is never automatically resubmitted.
 
-FLUX 3 Shoot defaults to **2K area** (2768x1520 widescreen), with a **1K** option
+FLUX 3 and MOSS Shoot default to **2K area** (2768x1520 widescreen), with a **1K** option
 (1376x752). Expand prompt runs the open-weight BFL caption model in the same job,
 using its runtime-fetched t2i instructions plus deep-focus, style, distance and
 no-brand rules. Turn it off to supply your own caption verbatim. Klein 4B remains
@@ -121,6 +124,9 @@ selectable and keeps the existing UI generation size. The user request, actual
 expanded caption when returned by history, model files and graph are preserved
 in the recipe/API PNG. Missing caption weights fail before submission with an
 explicit suggestion to turn expansion off; there is no silent hosted LLM fallback.
+MOSS uses the official ordinary sampling path, 25 er_sde/simple steps at CFG 2.5,
+with caption expansion and SLG off. Its two tested scene requests produced softer
+foreground detail than requested; successful execution does not imply a quality win.
 The caption model can still change composition or ignore constraints, including
 text suppression. Review the result; use a supplied caption with expansion off
 when exact wording matters. Deep focus in a prompt is not a sharpness guarantee.

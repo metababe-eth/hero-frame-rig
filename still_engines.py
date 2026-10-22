@@ -3,20 +3,11 @@ import math
 from functools import lru_cache
 import httpx
 import rig_workflow as rig
+import engine_templates
 
-ENGINES = {
-    'flux3': {'label': 'FLUX 3 Image Klein', 'type': 'flux3',
-              'unet': ['flux3-image-klein-int8-convrot.safetensors', 'flux3-image-klein-bf16.safetensors'],
-              'clip': ['qwen3vl_4b_int8_convrot.safetensors'], 'vae': ['flux2-vae.safetensors']},
-    'moss': {'label': 'MOSS-Image', 'type': 'moss_image',
-             'unet': ['moss_image_sft_int8_convrot.safetensors', 'moss_image_sft_bf16.safetensors'],
-             'clip': ['qwen3.5_9b_w4a8_gptq.safetensors'], 'vae': ['flux2-vae_small.safetensors']},
-    'klein4b': {'label': 'FLUX.2 Klein 4B', 'type': 'flux2',
-                'unet': ['flux-2-klein-4b.safetensors'], 'clip': ['qwen_3_4b.safetensors'],
-                'vae': ['flux2-vae.safetensors']},
-}
+ENGINES = engine_templates.snapshot()
 
-PUP_FILE = 'qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors'
+PUP_FILE = ENGINES['flux3']['pup']
 PUP_SOURCE = 'https://huggingface.co/black-forest-labs/flux-3-image-klein-pup/resolve/main/system_prompts.json'
 RIG_RULE = ('Hero Frame Rig constraint: keep deep focus from foreground to background. '
             'Preserve the stated visual style exactly. Keep the stated near object and '
@@ -41,12 +32,12 @@ def canvas(resolution='2K', aspect=1280 / 704):
             round(side / math.sqrt(aspect) / 16) * 16)
 
 
-def choices(info, node, field):
+def choices(info, node, field, cloud=True):
     data = info.get(node, {}).get('input', {}).get('required', {}).get(field, [[]])
     values = list(data[0]) if isinstance(data[0], list) else list(data[1].get('options', [])) if len(data)>1 else []
     tag = {('UNETLoader','unet_name'): 'diffusion_models',
            ('CLIPLoader','clip_name'): 'text_encoders', ('VAELoader','vae_name'): 'vae'}.get((node, field))
-    for asset in info.get('_hfr_cloud_catalogue', []):
+    for asset in info.get('_hfr_cloud_catalogue', []) if cloud else []:
         if tag and tag in asset.get('tags', []) and asset.get('path'):
             values.append(asset['path'])
     return list(dict.fromkeys(values))
@@ -54,13 +45,18 @@ def choices(info, node, field):
 
 def availability(info, kind):
     result = {}
-    for key, spec in ENGINES.items():
+    specs = info.get('_hfr_engine_specs', ENGINES)
+    for key in ENGINES:
+        if key not in specs:
+            result[key] = dict(available=False, reason=info.get('_hfr_template_errors', {}).get(key, 'Official template unavailable; reconnect to refresh.'), files={})
+            continue
+        spec = specs[key]
         files, missing = {}, []
         for role, node, field in [('unet', 'UNETLoader', 'unet_name'), ('clip', 'CLIPLoader', 'clip_name'), ('vae', 'VAELoader', 'vae_name')]:
-            installed = choices(info, node, field)
+            installed = choices(info, node, field, cloud=kind == 'Comfy Cloud')
             files[role] = next((v for preferred in spec[role] for v in installed if v.replace('\\', '/').split('/')[-1] == preferred), None)
             if files[role] is None: missing.append(spec[role][0])
-        if spec['type'] not in choices(info, 'CLIPLoader', 'type'):
+        if spec['type'] not in choices(info, 'CLIPLoader', 'type', cloud=False):
             missing.append('CLIPLoader type ' + spec['type'])
         required = ['CLIPTextEncode', 'VAEDecode', 'EmptyFlux2LatentImage', 'SaveImage']
         required += ['ConditioningZeroOut', 'CFGGuider', 'RandomNoise', 'KSamplerSelect', 'Flux2Scheduler', 'SamplerCustomAdvanced'] if key == 'klein4b' else ['KSampler']
@@ -90,27 +86,30 @@ def resolve(engine, info, kind):
 
 def graph(prompt, seed, width, height, engine, info, kind, analysis=False, expand_prompt=True):
     engine, files = resolve(engine, info, kind)
+    spec = info.get('_hfr_engine_specs', ENGINES)[engine]
     if engine == 'klein4b':
         nodes = {k: v for k, v in rig._shoot_nodes(prompt, 50, seed, width, height, prompt=prompt).items() if int(k) <= 13}
     else:
-        # Fresh official distilled template (2026-10-21), flattened. MOSS SLG off.
+        # Preserve the accepted Brief25 FLUX 3 sampling behavior. This pass
+        # refreshes its filenames; only MOSS takes its sampler from the template.
+        sampling = spec['sampling'] if engine == 'moss' else dict(steps=16, cfg=1.0, sampler_name='euler', scheduler='simple', denoise=1.0)
+        # Official template's ordinary sampling path, with MOSS caption expansion
+        # and SLG switches off. Keep IDs stable for the shared analysis/recipe path.
         nodes = {
             '1': {'class_type': 'UNETLoader', 'inputs': {'unet_name': files['unet'], 'weight_dtype': 'default'}},
-            '2': {'class_type': 'CLIPLoader', 'inputs': {'clip_name': files['clip'], 'type': ENGINES[engine]['type'], 'device': 'default'}},
+            '2': {'class_type': 'CLIPLoader', 'inputs': {'clip_name': files['clip'], 'type': spec['type'], 'device': 'default'}},
             '3': {'class_type': 'VAELoader', 'inputs': {'vae_name': files['vae']}},
             '4': {'class_type': 'CLIPTextEncode', 'inputs': {'clip': ['2', 0], 'text': prompt}},
             '5': {'class_type': 'CLIPTextEncode', 'inputs': {'clip': ['2', 0], 'text': 'nsfw, worst quality, bad anatomy, watermark, jpeg artifact' if engine == 'moss' else ''}},
             '10': {'class_type': 'EmptyFlux2LatentImage', 'inputs': {'width': width, 'height': height, 'batch_size': 1}},
             '11': {'class_type': 'KSampler', 'inputs': {'model': ['1', 0], 'positive': ['4', 0], 'negative': ['5', 0],
-                    'latent_image': ['10', 0], 'seed': seed, 'steps': 25 if engine == 'moss' else 16,
-                    'cfg': 2.5 if engine == 'moss' else 1.0, 'sampler_name': 'er_sde' if engine == 'moss' else 'euler',
-                    'scheduler': 'simple', 'denoise': 1.0}},
+                    'latent_image': ['10', 0], 'seed': seed, **sampling}},
             '12': {'class_type': 'VAEDecode', 'inputs': {'samples': ['11', 0], 'vae': ['3', 0]}},
             '13': {'class_type': 'SaveImage', 'inputs': {'images': ['12', 0], 'filename_prefix': 'rig/still'}},
         }
     if engine == 'flux3' and expand_prompt:
-        pup = next((p for p in choices(info, 'CLIPLoader', 'clip_name')
-                    if p.replace('\\', '/').split('/')[-1] == PUP_FILE), None)
+        pup = next((p for p in choices(info, 'CLIPLoader', 'clip_name', cloud=kind == 'Comfy Cloud')
+                    if p.replace('\\', '/').split('/')[-1] == spec.get('pup')), None)
         if not pup or 'TextGenerate' not in info or 'PreviewAny' not in info:
             raise ValueError('FLUX 3 caption model is unavailable. Turn off Expand prompt to use your caption verbatim.')
         nodes.update({

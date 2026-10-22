@@ -11,6 +11,7 @@ import threading
 import time
 from contextlib import contextmanager
 from contextlib import nullcontext
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from urllib.parse import urlsplit
 
@@ -82,20 +83,24 @@ def object_info(cfg=None):
     if cfg['kind'] == CLOUD:
         # Cloud's object_info enums omit some executable asset-library models.
         # Preserve that schema; supply a separate live catalogue for discovery.
-        catalogue = []
-        for term in ('flux3', 'qwen3vl_4b'):
+        import engine_templates
+        specs, errors = engine_templates.discover(cloud=True)
+        data['_hfr_engine_specs'], data['_hfr_template_errors'] = specs, errors
+        names = {name for spec in specs.values() for role in ('unet', 'clip', 'vae') for name in spec[role]}
+        names.update(spec['pup'] for spec in specs.values() if spec.get('pup'))
+        def lookup(term):
             try:
                 assets = httpx.get('https://cloud.comfy.org/api/assets', headers=headers,
                     params={'include_tags': 'models', 'include_public': 'true',
                             'name_contains': term, 'limit': 100}, timeout=20)
                 assets.raise_for_status()
-                catalogue.extend({'path': a.get('loader_path') or a.get('name'),
-                                  'tags': a.get('tags', [])}
-                                 for a in assets.json().get('assets', []))
+                return [{'path': a.get('loader_path') or a.get('name'),
+                         'tags': a.get('tags', [])} for a in assets.json().get('assets', [])]
             except (httpx.HTTPError, ValueError):
                 # Existing loader inventory remains usable; do not invent files.
-                continue
-        data['_hfr_cloud_catalogue'] = catalogue
+                return []
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            data['_hfr_cloud_catalogue'] = [asset for rows in pool.map(lookup, sorted(names)) for asset in rows]
     return data
 
 

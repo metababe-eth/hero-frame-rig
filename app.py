@@ -428,7 +428,7 @@ def shoot(scene, shot, lens, f_stop, stock, mode, hold, seed, guide=0, engine="a
     try:
         info, kind = backend.object_info(), backend.config()['kind']
         selected_engine, _ = still_engines.resolve(engine, info, kind)
-        width, height = still_engines.canvas(resolution) if selected_engine == 'flux3' else (1344, 768)
+        width, height = still_engines.canvas(resolution) if selected_engine in ('flux3', 'moss') else (1344, 768)
         graph, selected_engine = still_engines.graph(prompt, int(seed), width, height, selected_engine,
             info, kind, analysis=True, expand_prompt=expand_prompt)
     except ValueError as exc:

@@ -40,6 +40,30 @@ class StillEngines(unittest.TestCase):
         self.assertEqual(graph['11']['inputs']['seed'], 701)
         self.assertEqual(graph['11']['inputs']['steps'], 16)
 
+    def test_local_inventory_cannot_be_enabled_by_cloud_catalogue(self):
+        with self.assertRaises(ValueError): engines.resolve('flux3', cloud_info(), 'Local ComfyUI')
+
+    def test_fresh_template_names_enable_moss_only_when_all_assets_exist(self):
+        import copy
+        info=cloud_info(); specs=copy.deepcopy(engines.ENGINES)
+        specs['moss']['unet']=['new-moss-name.safetensors']
+        info['_hfr_engine_specs']=specs
+        info['CLIPLoader']['input']['required']['type'][0].append('moss_image')
+        for role,tag in [('unet','diffusion_models'),('clip','text_encoders'),('vae','vae')]:
+            info['_hfr_cloud_catalogue'].append({'path':specs['moss'][role][0],'tags':[tag]})
+        g,key=engines.graph('same scene',701,1280,704,'moss',info,'Comfy Cloud')
+        self.assertEqual(key,'moss');self.assertEqual(g['1']['inputs']['unet_name'],'new-moss-name.safetensors')
+        self.assertEqual(g['11']['inputs']['steps'],25)
+        self.assertEqual(g['11']['inputs']['sampler_name'],'er_sde')
+        self.assertEqual(g['4']['inputs']['text'],'same scene')
+        self.assertNotIn('102',g)
+        info['_hfr_cloud_catalogue'].pop()
+        self.assertFalse(engines.availability(info,'Comfy Cloud')['moss']['available'])
+
+    def test_failed_template_refresh_does_not_fall_back_to_old_cloud_names(self):
+        info=cloud_info();info['_hfr_engine_specs']={}
+        self.assertFalse(engines.availability(info,'Comfy Cloud')['flux3']['available'])
+
     def test_verbatim_mode_needs_neither_caption_model_nor_network(self):
         info = cloud_info(); info['_hfr_cloud_catalogue'].pop(); info.pop('TextGenerate')
         with patch.object(engines, 'prompt_system', side_effect=AssertionError('network not expected')):
