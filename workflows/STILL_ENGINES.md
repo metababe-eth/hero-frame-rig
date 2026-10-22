@@ -16,14 +16,24 @@ seed, dimensions, model, job and graph. The UI recipe retains the same informati
 
 Cloud's object_info loader enums were a false negative for this executed model.
 Backend discovery supplements them with live `/api/assets` loader paths for
-FLUX 3 and its encoder, while still checking required core classes and CLIP type.
+every engine's UNET, encoder and VAE (plus FLUX 3 PUP), while still checking required core classes and CLIP type.
+`engine_templates.py` fetches the current official templates once per hour and
+extracts their loader names. A failed refresh disables the affected Cloud engine;
+the bundled `engine_templates.json` is used only for offline local matching.
 A catalogue entry is discovery evidence, not proof that every variant executes.
 Local discovery still requires the installed loader names; no weights download
 occurs when selecting an engine. Auto chooses the first available engine, FLUX 3
 then MOSS then Klein 4B. Explicit Klein 4B remains selectable.
 
-UI FLUX 3 default is 2K area (2768x1520); 1K is 1376x752. API dimensions are
-explicit and bounded. MOSS's optional SLG remains off and its generation has not
-been tested. Its prepared graph uses 25 er_sde/simple steps and CFG 2.5.
+UI FLUX 3 and MOSS default is 2K area (2768x1520); 1K is 1376x752. API dimensions are
+explicit and bounded. MOSS ran two 1280x704 scenes and a real 2768x1520 UI Shoot
+with depth, matte, development and recipe on 2026-10-21. Its official
+[template](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/image_moss_image_t2i.json)
+ordinary path uses 25 er_sde/simple steps and CFG 2.5, with SLG and caption expansion off.
+Fresh filenames were `moss_image_sft_int8_convrot.safetensors`,
+`qwen3.5_9b_w4a8_gptq.safetensors`, and `flux2-vae_small.safetensors`.
+The same scene requests and seed 701 were compared with FLUX 3; conditioning is
+not identical because those earlier FLUX 3 shots used PUP. MOSS foreground blur
+limits deep-focus reuse and reliable hand inspection in the hallway comparison.
 Klein 4B's original generation graph is unchanged. The standalone focus pack is
 MIT; app code is Apache-2.0; model licences are separate (MODEL_LICENSES.md).

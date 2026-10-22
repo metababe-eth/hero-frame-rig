@@ -1,0 +1,65 @@
+{
+  "retrieved_utc": "2026-10-22T01:05:17.044484+00:00",
+  "engines": {
+    "flux3": {
+      "label": "FLUX 3 Image Klein",
+      "template": "image_flux3_klein_distilled_t2i",
+      "source": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux3_klein_distilled_t2i.json",
+      "unet": [
+        "flux3-image-klein-int8-convrot.safetensors"
+      ],
+      "clip": [
+        "qwen3vl_4b_int8_convrot.safetensors"
+      ],
+      "vae": [
+        "flux2-vae.safetensors"
+      ],
+      "type": "flux3",
+      "pup": "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors",
+      "sampling": {
+        "steps": 15,
+        "cfg": 1,
+        "sampler_name": "er_sde",
+        "scheduler": "simple",
+        "denoise": 1
+      }
+    },
+    "moss": {
+      "label": "MOSS-Image",
+      "template": "image_moss_image_t2i",
+      "source": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_moss_image_t2i.json",
+      "unet": [
+        "moss_image_sft_int8_convrot.safetensors"
+      ],
+      "clip": [
+        "qwen3.5_9b_w4a8_gptq.safetensors"
+      ],
+      "vae": [
+        "flux2-vae_small.safetensors"
+      ],
+      "type": "moss_image",
+      "sampling": {
+        "steps": 25,
+        "cfg": 2.5,
+        "sampler_name": "er_sde",
+        "scheduler": "simple",
+        "denoise": 1
+      }
+    },
+    "klein4b": {
+      "label": "FLUX.2 Klein 4B",
+      "template": "image_flux2_klein_text_to_image",
+      "source": "https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_text_to_image.json",
+      "unet": [
+        "flux-2-klein-4b.safetensors"
+      ],
+      "clip": [
+        "qwen_3_4b.safetensors"
+      ],
+      "vae": [
+        "flux2-vae.safetensors"
+      ],
+      "type": "flux2"
+    }
+  }
+}
