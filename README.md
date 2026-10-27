@@ -17,6 +17,9 @@ short_description: Direct the focus of any clip after it's made.
 
 “Other tools ask the model to rack focus. Hero Frame Rig lets you decide after it's made, and change your mind.”
 
+By **Max Krane** for the [Open Source Higgsfield](https://comfy.org/open-source-higgsfield) competition.
+Code: <https://github.com/metababe-eth/hero-frame-rig> · Try it: <https://huggingface.co/spaces/metababa/hero-frame-rig-release> (bring your own Comfy key, or run it locally)
+
 Bring a clip you care about. Tap what should be sharp at the start and end, compare
 the treatment with your original, and keep the clip plus a replayable recipe.
 Stills, generated motion and reusable ComfyUI focus nodes are part of the same tool.
@@ -33,7 +36,7 @@ chip; we have not tested its output quality or ruled out its post-generation too
 - **Use my image:** bring a photo, choose focus and a treatment, compare looks and export the image plus its recipe. Generated stills also offer landscape, portrait and square formats.
 - **Make a clip:** animate an image, then direct the resulting clip.
 
-Demo: [DEMO_URL]
+Demo (63 s): <https://youtu.be/Qd7rQEUgKno>
 
 The app's default motion model is **LTX-2.3**. The locked demo also uses footage
 made with **LTX-2.5 on Comfy Cloud**. Its dialogue-production models are demo-media
@@ -88,7 +91,7 @@ Python environment separate from your GPU ComfyUI environment. Start ComfyUI as
 usual; its default address is `http://127.0.0.1:8188`.
 
 ```powershell
-git clone [PUBLIC_GITHUB_URL]
+git clone https://github.com/metababe-eth/hero-frame-rig.git
 cd hero-frame-rig
 python -m venv .venv
 .venv\Scripts\Activate.ps1
@@ -182,16 +185,14 @@ when exact wording matters. Deep focus in a prompt is not a sharpness guarantee.
 ## Agent API
 
 Two stateless Gradio endpoints are documented in the live schema and `agents.md`.
-The private Space additionally needs an authorized HF token. For a future public
-Space omit that token, but keep your own Comfy key header. This example performs
-paid Cloud work when executed:
+Every hosted call needs your own Comfy key in the header. This example performs
+paid Cloud work on your account when executed:
 
 ```python
 import os
 from gradio_client import Client, handle_file
-from huggingface_hub import get_token
 
-client = Client("metababa/hero-frame-rig-release", token=get_token(),
+client = Client("metababa/hero-frame-rig-release",
                 headers={"X-Comfy-API-Key": os.environ["COMFY_API_KEY"]})
 directed, share, recipe = client.predict(
     video=handle_file("clip.mp4"), start_x=.25, start_y=.45,
@@ -261,5 +262,5 @@ See [the detailed licence list](MODEL_LICENSES.md) for text encoders, VAEs, matt
 model and runtime dependencies. Open weights does not mean every model is under
 an OSI open-source licence. No weights or runtime binaries are redistributed.
 
-This code-only release candidate is private pending review. No demo media, model
-weights, owner credentials or internal submission drafts are bundled.
+This is a code-only release. No demo media, model weights, owner credentials or
+internal submission drafts are bundled.
