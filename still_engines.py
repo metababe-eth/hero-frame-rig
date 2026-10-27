@@ -6,6 +6,7 @@ import rig_workflow as rig
 import engine_templates
 
 ENGINES = engine_templates.snapshot()
+FORMATS = {'Landscape': 1280 / 704, 'Square': 1.0, 'Portrait': 704 / 1280}
 
 PUP_FILE = ENGINES['flux3']['pup']
 PUP_SOURCE = 'https://huggingface.co/black-forest-labs/flux-3-image-klein-pup/resolve/main/system_prompts.json'
@@ -30,6 +31,19 @@ def canvas(resolution='2K', aspect=1280 / 704):
     side = 2048 if resolution == '2K' else 1024
     return (round(side * math.sqrt(aspect) / 16) * 16,
             round(side / math.sqrt(aspect) / 16) * 16)
+
+
+def shoot_canvas(engine, resolution='2K', image_format=None):
+    """UI formats share an area budget; omitted format retains old Shoot canvases."""
+    if engine not in ENGINES:
+        raise ValueError('Choose an available image engine.')
+    if image_format is None:
+        return canvas(resolution) if engine in ('flux3', 'moss') else (1344, 768)
+    if image_format not in FORMATS:
+        raise ValueError('Image format must be Landscape, Square or Portrait.')
+    if resolution not in ('1K', '2K'):
+        raise ValueError('Image size must be 1K or 2K.')
+    return canvas(resolution, FORMATS[image_format])
 
 
 def choices(info, node, field, cloud=True):

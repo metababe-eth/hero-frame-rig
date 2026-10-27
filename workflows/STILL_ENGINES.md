@@ -37,3 +37,28 @@ not identical because those earlier FLUX 3 shots used PUP. MOSS foreground blur
 limits deep-focus reuse and reliable hand inspection in the hallway comparison.
 Klein 4B's original generation graph is unchanged. The standalone focus pack is
 MIT; app code is Apache-2.0; model licences are separate (MODEL_LICENSES.md).
+
+## Own-image entry and generated formats — 2026-10-23
+
+The app opens with **Use my clip**, **Use my image**, and **Make a clip**.
+Use my image presents upload first; generation is inside **Or generate a new image**.
+Uploads preserve their own aspect and original file in the recipe. Their processing
+copy remains limited to a 1600 px long side; choosing a generation format does not
+crop, resize, or regenerate an uploaded image.
+
+All three existing engines accept the generated image Format and Image size controls:
+
+| Size | Landscape | Square | Portrait |
+| --- | --- | --- | --- |
+| 1K | 1376 × 752 | 1024 × 1024 | 752 × 1376 |
+| 2K | 2768 × 1520 | 2048 × 2048 | 1520 × 2768 |
+
+The size names describe approximate image area, not long-side resolution. Every
+canvas remains on a 16 px grid and below 4.3 MP. Format and exact dimensions are
+saved in the recipe. These are graph-supported choices, not a claim of a new
+successful inference at every size. Engine availability remains inventory-based.
+
+Calls to `app.shoot` that omit the new final `image_format` argument retain previous
+dimensions, including Klein 4B's 1344 × 768 canvas. `/shoot_still` retains its explicit
+width/height defaults and limits. No new model, HD adapter, sampling behavior or
+image-editing algorithm is enabled by these UI changes.

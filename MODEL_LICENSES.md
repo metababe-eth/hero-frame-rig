@@ -5,6 +5,8 @@ variants; Cloud worker revisions and weight bytes have not been independently
 audited. Install/download models under their own terms; app licences do not
 relicense them. Nothing in this document is a release approval.
 
+## App runtime and optional generation dependencies
+
 | Component | Licence | Primary source / scope |
 | --- | --- | --- |
 | FLUX 3 Image Klein distilled | FLUX Kommunity License v1.0 | [BFL](https://huggingface.co/black-forest-labs/flux-3-image-klein). Custom noncommercial terms with a qualifying-user commercial-output exception; read the full licence. Not Apache/MIT. |
@@ -12,7 +14,6 @@ relicense them. Nothing in this document is a release approval.
 | FLUX.2 Klein **4B** | Apache-2.0 | [BFL](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B). Do not substitute 9B licence assumptions. |
 | DA3 **Metric Large** | Apache-2.0 | [DA3METRIC-LARGE](https://huggingface.co/depth-anything/DA3METRIC-LARGE); not a blanket statement about every DA3 variant. |
 | LTX-2.3 dev FP8 + distilled LoRA | LTX-2 Community License Agreement | [Lightricks licence](https://huggingface.co/Lightricks/LTX-2.3/blob/main/LICENSE). Custom commercial/use/distribution conditions. [FP8 card](https://huggingface.co/Lightricks/LTX-2.3-fp8). |
-| ACE-Step **1.5 XL Turbo** | MIT | [Exact soundtrack variant](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo), [1.5 family](https://huggingface.co/ACE-Step/Ace-Step1.5). Brief 31 graph requests `acestep_v1.5_xl_turbo_bf16.safetensors`, not the differently licensed v1 3.5B. |
 | BiRefNet | MIT | [Upstream](https://huggingface.co/ZhengPeng7/BiRefNet), [Comfy repack](https://huggingface.co/Comfy-Org/BiRefNet). Matte, not face recognition. |
 | Qwen3-4B and Qwen3-VL-4B-Instruct | Apache-2.0 | [Qwen3](https://huggingface.co/Qwen/Qwen3-4B), [Qwen3-VL](https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct). FLUX prompt encoders. |
 | Qwen3.5-9B | Apache-2.0 | [Qwen](https://huggingface.co/Qwen/Qwen3.5-9B). MOSS encoder; quantized repack separately identified in the engine guide. |
@@ -23,6 +24,24 @@ relicense them. Nothing in this document is a release approval.
 | Comfy workflow templates | MIT | [Licence](https://github.com/Comfy-Org/workflow_templates/blob/main/LICENSE). Adapted graph notice retained in THIRD_PARTY_NOTICES.md. |
 | ComfyUI | GPL-3.0 | [Licence](https://github.com/Comfy-Org/ComfyUI/blob/master/LICENSE). Separate runtime; not bundled with app code. |
 | Radiance legacy custom nodes | GPL-3.0 | [Tested historical source](https://github.com/FXTD-Studios/radiance/blob/f262f47ddfda01ece154bf80c22769b1e4cef795/LICENSE). Used by legacy still/depth graphs, not vendored in the MIT shared renderer. |
+
+## Demo-media production models (not app runtime)
+
+These credits describe tools used to prepare demo footage/dialogue, not additional
+features or dependencies installed by the app. No weights, demo media or voices
+are bundled in this release. Area / Pick details itself uses local Gaussian
+compositing and no model, depth inference, tracking or Cloud job.
+
+| Model | Licence | Demo-media role / primary source |
+| --- | --- | --- |
+| LTX-2.5 | LTX-2.x Community License Agreement, custom terms | Demo footage generated on Comfy Cloud. [Model card](https://huggingface.co/Lightricks/LTX-2.5), [licence](https://github.com/Lightricks/LTX-2/blob/main/LICENSE). Separate from the app's LTX-2.3 default. |
+| Chatterbox | MIT | Dialogue production. [Model card](https://huggingface.co/ResembleAI/chatterbox), [code licence](https://github.com/resemble-ai/chatterbox/blob/master/LICENSE). |
+| Qwen3-TTS | Apache-2.0 | Dialogue production. [CustomVoice model card](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice), [code licence](https://github.com/QwenLM/Qwen3-TTS/blob/main/LICENSE). |
+| ACE-Step 1.5 XL Turbo | MIT | Earlier demo soundtrack study, not an app generation button or a claim about the locked V13 period-music source. [Exact variant](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo). |
+
+Primary model cards and upstream licences checked 26 October 2026. The LTX licence
+has custom use and distribution conditions; it is not an Apache/MIT licence.
+Model terms do not grant rights to Maxwell's artwork or separate soundtrack media.
 
 Other installed dependencies include Gradio (Apache-2.0), PyTorch (BSD-style),
 NumPy (BSD-3-Clause), Pillow (HPND), OpenEXR (BSD-3-Clause), OpenCV (Apache-2.0)

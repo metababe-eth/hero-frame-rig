@@ -1,7 +1,7 @@
 """Read-only presentation helpers for saved frames; no rendering or Cloud calls.
 
-An optional take['focus_point'] stores normalized image coordinates in UI state,
-outside settings and recipe export. Legacy/automatic-focus takes have no marker.
+An optional take['focus_point'] stores normalized image coordinates in UI state
+and new recipe exports. Legacy/automatic-focus takes have no invented marker.
 """
 from __future__ import annotations
 

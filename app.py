@@ -38,11 +38,13 @@ from PIL import Image
 import optics
 import rig_workflow as rig
 from frame_input import prepare_upload
+from image_recipe import load_image_recipe
 import provenance
 import ui_state
 import clip_focus
 import clip_upload
 import clip_flow
+import detail_focus
 import camera_control
 import agent_api
 import backend
@@ -157,7 +159,7 @@ def _blur(state, f_stop, mode):
     return min(b, optics.MAX_BLUR), min(b, optics.MAX_BLUR) / b1, b > optics.MAX_BLUR
 
 
-def _maps(state, blur, hold, tag):
+def _maps(state, blur, hold, tag, photo_edges=False):
     """Maps for one take. With the subject layer on and matte subjects at or in front of
     the focus plane: the subject layer, its flat disparity, its matte and the clean
     background plate (layered develop). Otherwise one disparity map with foreground spill.
@@ -182,7 +184,8 @@ def _maps(state, blur, hold, tag):
             files["plate_disparity"] = optics.save_disparity(
                 optics.spread_foreground(plate_d, focus, blur), path("plate_disparity"))
             return files, held, len(layer_ids)
-    d = optics.spread_foreground(d, focus, blur)
+    if not photo_edges:
+        d = optics.spread_foreground(d, focus, blur)
     return {"disparity": optics.save_disparity(d, path("disparity"))}, 0, 0
 
 
@@ -199,15 +202,19 @@ def _develop(client, state, treatments, hold, guide=0):
     mask_assets = {}
     graphs, wfs, pending = [], [], []
     for i, (f_stop, stock, mode) in enumerate(treatments):
-        n = len(state["takes"]) + i + 1
+        n = max((take["n"] for take in state["takes"]), default=0) + i + 1
         tag = f"take{n:02d}"
         blur, strength, capped = _blur(state, f_stop, mode)
-        files, held, layered = _maps(state, blur, hold, tag)
+        # Saved takes retain their original graphs. New unlayered photograph takes
+        # use bounded highlights and smooth foreground weights from raw disparity.
+        photo_edges = state.get("source") == "uploaded" and not hold
+        files, held, layered = _maps(state, blur, hold, tag, photo_edges=photo_edges)
         round_masks = {}
         roles = (("subject", "layer_disparity"), ("plate", "plate_disparity")) if layered else (("main", "disparity"),)
         for role, disparity_key in roles:
             prefix = os.path.join(state["dir"], f"{tag}_round_{role}_weight")
-            masks = rig.round_lens.prepare_weights(files[disparity_key], prefix, blur, state["focus"])
+            prepare = rig.round_lens.prepare_photo_weights if photo_edges else rig.round_lens.prepare_weights
+            masks = prepare(files[disparity_key], prefix, blur, state["focus"])
             for level, mask_path in enumerate(masks, 1):
                 files[f"round_{role}_weight_{level}"] = mask_path
             round_masks[role] = [os.path.basename(mask_path) for mask_path in masks]
@@ -229,7 +236,7 @@ def _develop(client, state, treatments, hold, guide=0):
         else:
             graph = rig.develop("still.png", names["disparity"], blur, state["focus"], stock,
                                 round_masks=round_masks, width=state["width"], height=state["height"],
-                                guide=guide, guide_masks=guide_masks)
+                                guide=guide, guide_masks=guide_masks, photo_edges=photo_edges)
             inputs = {"21": files["disparity"]}
         wf = client.workflows.from_json(copy.deepcopy(graph))  # set_input writes into it
         for node, p in inputs.items():
@@ -251,8 +258,10 @@ def _develop(client, state, treatments, hold, guide=0):
                     "focus_m": round(optics.focus_metres(state["focus"], state["z_near"]), 2),
                     "subject_layer_enabled": bool(hold),
                     "subject_label": state["label"], "held": held, "layered": layered,
-                    "grain_seed": 7, "lens_graph_version": rig.round_lens.VERSION,
-                    "lens_kernel": rig.round_lens.describe(blur, state["width"], state["height"])}
+                    "grain_seed": 7,
+                    "lens_graph_version": rig.round_lens.PHOTO_VERSION if photo_edges else rig.round_lens.VERSION,
+                    "lens_kernel": (rig.round_lens.describe_photo if photo_edges else rig.round_lens.describe)(
+                        blur, state["width"], state["height"])}
         settings["guide"] = guide
         if guide_spec:
             settings["guide_render"] = guide_spec
@@ -298,9 +307,13 @@ def _outputs(state):
             gr.update(choices=[(f"#{take['n']} · f/{take['settings']['f_stop']:g} · "
                                 f"{take['settings']['focus_m']:.1f} m (est.) · {take['settings']['look']}", take['n'])
                                for take in reversed(state["takes"])], value=t["n"]),
-            settings["f_stop"], settings["look"], settings["mode"],
+            gr.update(choices=F_STOPS if settings["f_stop"] in [v for _, v in F_STOPS]
+                      else F_STOPS + [(f"f/{settings['f_stop']:g} (saved)", settings["f_stop"])],
+                      value=settings["f_stop"]), settings["look"],
+            CINE if settings["mode"].startswith("Cinematic") else TRUE,
             settings.get("subject_layer_enabled", bool(settings.get("layered"))), gr.update(value=None, visible=False),
-            state["lens"], state.get("shot") or ANY_LENS,
+            gr.update(choices=sorted(set([24, 35, 50, 85, state["lens"]])), value=state["lens"]),
+            state.get("shot") if state.get("shot") in SHOT_CHOICES else ANY_LENS,
             gr.update(visible=False), gr.update(visible=True), _frame_summary(state),
             "Frame", _stage_metadata(state, "Frame"),
             gr.update(choices=choices, value=a), gr.update(choices=choices, value=b),
@@ -315,7 +328,9 @@ def _take_preview(state, take):
 
 def _frame_summary(state):
     name = state.get("original_name") or ("Saved NOLA study" if state.get("study") else state.get("shot") or "Working frame")
-    return f"**1 · Frame** &nbsp; {html.escape(name)} · {state['width']} × {state['height']} · {len(state['takes'])} takes"
+    # Filenames/recipe labels are literal text, including Markdown link characters.
+    name = html.escape(name).translate(str.maketrans({c: f"&#{ord(c)};" for c in "[]()!*_`"}))
+    return f"**1 · Frame** &nbsp; {name} · {state['width']} × {state['height']} · {len(state['takes'])} takes"
 
 
 def _stage_metadata(state, view):
@@ -394,6 +409,23 @@ def open_study():
     return _outputs(state)
 
 
+def open_image_recipe(path):
+    """Open saved source, cached depth and takes; no backend or saved graph runs."""
+    if not path:
+        raise gr.Error("Choose a saved image recipe ZIP first.")
+    try:
+        state = load_image_recipe(path)
+    except ValueError as exc:
+        raise gr.Error(str(exc)) from exc
+    outputs = list(_outputs(state))
+    check = ("Package checksums verified." if state["imported_recipe"]["integrity_verified"]
+             else "Legacy recipe: no package checksum manifest was saved.")
+    outputs[5] = (f"**Opened {len(state['takes'])} saved takes · no backend job.** "
+                  f"{check} Choose a take or click a new focus point to continue.\n\n"
+                  + ui_state.take_readout(state))
+    return tuple(outputs)
+
+
 def choose_take(state, take_number):
     """Select a saved take and restore its controls, without rendering or a backend job."""
     if not state or not state.get("takes"):
@@ -416,7 +448,7 @@ def gallery_select(state, evt: gr.SelectData):
         raise gr.Error("Choose one of the saved takes.")
     return choose_take(state, takes[index]["n"])
 
-def shoot(scene, shot, lens, f_stop, stock, mode, hold, seed, guide=0, engine="auto", resolution="2K", expand_prompt=True):
+def shoot(scene, shot, lens, f_stop, stock, mode, hold, seed, guide=0, engine="auto", resolution="2K", expand_prompt=True, image_format=None):
     guide = rig.guide_eye.amount(guide)
     if not scene.strip():
         raise gr.Error("Describe the scene first.")
@@ -428,7 +460,7 @@ def shoot(scene, shot, lens, f_stop, stock, mode, hold, seed, guide=0, engine="a
     try:
         info, kind = backend.object_info(), backend.config()['kind']
         selected_engine, _ = still_engines.resolve(engine, info, kind)
-        width, height = still_engines.canvas(resolution) if selected_engine in ('flux3', 'moss') else (1344, 768)
+        width, height = still_engines.shoot_canvas(selected_engine, resolution, image_format)
         graph, selected_engine = still_engines.graph(prompt, int(seed), width, height, selected_engine,
             info, kind, analysis=True, expand_prompt=expand_prompt)
     except ValueError as exc:
@@ -443,7 +475,8 @@ def shoot(scene, shot, lens, f_stop, stock, mode, hold, seed, guide=0, engine="a
                 "seed": int(seed), "engine": selected_engine, "prompt": prompt,
                 "expanded_prompt": backend.expanded_caption(result.id) if '102' in graph else None,
                 "prompt_system_source": still_engines.PUP_SOURCE if '102' in graph else None,
-                "resolution": resolution, "width": width, "height": height,
+                "resolution": resolution if image_format is not None or selected_engine != "klein4b" else None,
+                "image_format": image_format or "Landscape", "width": width, "height": height,
                 "frame_graph": graph, "frame_job": result.id}
         state = _frame_state(directory, *files, lens, meta)
         state = _develop(client, state, [(f_stop, stock, mode)], hold, guide)
@@ -532,7 +565,9 @@ def save_recipe(state):
               "settings": t["settings"], "inputs": {k: os.path.basename(v) for k, v in t["files"].items()},
               "provenance": t.get("provenance", {"producer_revision": state.get("producer_revision"),
                                                 "source_recipe_sha256": state.get("source_recipe_sha256")}),
-              "graph": f"take{t['n']:02d}_develop_graph.json"} for t in state["takes"]]
+              "graph": f"take{t['n']:02d}_develop_graph.json",
+              **({"focus_point": t["focus_point"]} if t.get("focus_point") is not None else {})}
+             for t in state["takes"]]
     recipe = {
         "app": "Hero Frame Rig", "schema_version": 2,
         "made": datetime.now(timezone.utc).isoformat(),
@@ -560,6 +595,12 @@ def save_recipe(state):
                    "depth": rig.METRIC_MODEL, "subject_matte": "birefnet.safetensors (MIT)"},
         "takes": takes,
     }
+    if state.get("source") == "generated":
+        recipe["frame"].update({key: state[key] for key in ("image_format", "resolution")
+                               if state.get(key) is not None})
+    if state.get("imported_recipe"):
+        recipe["provenance"]["source_recipe"] = state["imported_recipe"]
+        recipe["models"] = state.get("recipe_models", recipe["models"])
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("README.txt", "Hero Frame Rig recipe\n\n"
                    "still.png is the RGB working frame used for every take. Uploaded originals are\n"
@@ -586,10 +627,20 @@ def save_recipe(state):
                            (state["sky"], "sky.png"), (state["matte"], "subject_matte.png"),
                            (state["disparity"], "disparity.png")):
             z.write(path, name)
+        written_inputs = set(z.namelist())
+
+        def write_input(path, name):
+            if name in written_inputs:
+                if hashlib.sha256(z.read(name)).digest() != hashlib.sha256(Path(path).read_bytes()).digest():
+                    raise gr.Error("Saved recipe has conflicting input filenames.")
+            else:
+                z.write(path, name)
+                written_inputs.add(name)
+
         for t in state["takes"]:
-            z.write(t["hero"], f"take{t['n']:02d}_hero.png")
+            write_input(t["hero"], f"take{t['n']:02d}_hero.png")
             for path in t["files"].values():
-                z.write(path, os.path.basename(path))
+                write_input(path, os.path.basename(path))
             z.writestr(f"take{t['n']:02d}_develop_graph.json", json.dumps(t["graph"], indent=2))
         dependencies = Path(__file__).parent / "DEPENDENCIES.md"
         if dependencies.is_file():
@@ -942,7 +993,7 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
             gr.HTML('<div class="brand">Hero Frame Rig <span>Hold the moment. Direct the focus.</span></div>')
             study_btn = gr.Button("Explore saved study", variant="secondary", size="sm", elem_id="study-button", scale=0,interactive=(ROOT/'examples/nola_study.zip').is_file())
 
-        with gr.Accordion("Backend · local first, Cloud optional", open=True, elem_id="backend-settings"):
+        with gr.Accordion("Backend · local first, Cloud optional", open=False, elem_id="backend-settings"):
             with gr.Row():
                 backend_kind = gr.Radio([backend.LOCAL, backend.CLOUD], value=backend.defaults()['kind'], label="Run jobs on")
                 backend_url = gr.Textbox(value=backend.defaults()['url'], label="Local ComfyUI URL")
@@ -951,99 +1002,99 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
             backend_status = gr.Markdown("Checking the active backend…")
 
         with gr.Tabs(selected="direct",elem_id="workflow-tabs") as workflow_tabs:
-            with gr.Tab("Direct a clip",id="direct",elem_id="motion-tab") as motion_tab:
-                gr.Markdown('**1 · Your clip**',elem_id='clip-source-heading')
-                with gr.Row(elem_id='clip-source-fields'):
-                    phone_clip=gr.File(label='Drop a clip (MP4 or MOV)',type='filepath',file_types=['.mp4','.mov'],height=125,min_width=0,elem_id='phone-clip-upload',elem_classes=['rig-input-file'],scale=3)
-                    clip_study_button=gr.Button('No clip? Try ours',elem_id='clip-study-button',scale=1,min_width=140,interactive=(ROOT/'examples/arrival/arrival_recipe.zip').is_file())
-                change_clip_button=gr.Button('Change clip',elem_id='change-clip-button',size='sm')
-                with gr.Column(visible=False,elem_id='clip-workbench') as clip_workbench:
-                    with gr.Column(elem_id='clip-layout'):
-                        gr.Markdown("**2 · Tap what's sharp**",elem_id='clip-aim-heading')
-                        with gr.Row(elem_id='clip-endpoints'):
-                            clip_start=gr.Image(label="Start: tap what's sharp",type='pil',interactive=False,format='png',buttons=[],min_width=0,elem_id='clip-start')
-                            clip_end=gr.Image(label="End: tap what's sharp",type='pil',interactive=False,format='png',buttons=[],min_width=0,elem_id='clip-end')
-                        with gr.Column(min_width=0,elem_id='clip-controls'):
-                            gr.Markdown('**3 · Direct it**')
-                            clip_direct_button=gr.Button('Direct it',interactive=False,variant='primary',elem_id='clip-direct-button')
-                            clip_cost=gr.Markdown(elem_id='clip-cost')
-                            clip_status=gr.HTML(elem_id='clip-status')
-                    with gr.Accordion('More controls',open=False,elem_id='clip-more-controls'):
-                        clip_aperture=gr.Slider(0,100,value=100,step=1,label='Blur',elem_id='clip-aperture')
-                        gr.HTML('<div class="slider-ends"><span>Subtle</span><span>Strong</span></div>')
-                        clip_middle=gr.Radio(clip_flow.MIDDLE,value=clip_focus.HEAD,label='In between',elem_id='clip-middle')
-                        gr.Markdown('Face follow aims at the top of the subject. It can miss small or hidden faces.',elem_id='clip-follow-help')
-                        clip_landing=gr.Slider(50,95,value=85,step=1,label='When focus arrives',elem_id='clip-landing')
-                        gr.HTML('<div class="slider-ends"><span>Early</span><span>Late</span></div>')
-                        clip_guide=gr.Slider(0,100,value=60,step=1,label='Spotlight',info="Darkens what's out of focus",elem_id='clip-guide')
-                        clip_edge_cleanup=gr.Slider(0,1,value=.5,step=.05,label='Edge cleanup',info='Feathers thin edges toward nearby solid depth. 0 keeps the previous render.',elem_id='clip-edge-cleanup')
-                        with gr.Column(min_width=0,elem_id='clip-timeline'):
-                            gr.Markdown('**Focus over time**')
-                            clip_plot=gr.HTML(clip_focus.plot(None),elem_id='clip-plot')
-                        with gr.Accordion('Open a saved recipe',open=False):
-                            clip_recipe_upload=gr.File(label='Saved recipe ZIP',type='filepath',file_types=['.zip'],elem_id='clip-recipe-upload',elem_classes=['rig-input-file'])
-                            clip_import_button=gr.Button('Open recipe',elem_id='clip-import-button')
-                    with gr.Column(visible=False,elem_id='clip-result') as clip_result:
-                        gr.Markdown('**Your directed clip**')
-                        with gr.Column(min_width=0,elem_id='clip-viewer'):
-                            clip_toggle=gr.Radio([('Before','Sharp'),('After','Focus-directed')],value='Sharp',show_label=False,interactive=False,elem_id='clip-toggle')
-                            with gr.Row(elem_id='clip-videos'):
-                                animation_video=gr.Video(show_label=False,interactive=False,include_audio=False,loop=True,elem_id='clip-sharp',min_width=0,buttons=[])
-                                clip_compare=gr.Video(show_label=False,interactive=False,include_audio=False,loop=True,elem_id='clip-comparison',min_width=0,buttons=[])
-                            with gr.Row(elem_id='clip-result-actions',elem_classes=['rig-download-source']):
-                                clip_share_button=gr.Button('Share',variant='primary',elem_id='clip-share-button')
-                                gr.HTML('<div class="rig-download-buttons"><button type="button" data-rig-video-download="clip-comparison" disabled>Download</button></div>',elem_id='clip-download-actions')
-                        with gr.Accordion('More downloads',open=False,elem_id='clip-more-downloads'):
-                            gr.HTML('<div class="rig-download-source rig-download-buttons"><button type="button" data-rig-video-download="clip-sharp" disabled>Download original clip</button></div>')
-                            clip_save_button=gr.Button('Save recipe (.zip)',elem_id='clip-save-button')
-                            clip_recipe_download=gr.File(label='Saved recipe',interactive=False,visible=False,elem_id='clip-recipe-download',elem_classes=['rig-download-source'])
-                            clip_share_download=gr.File(label='Share files',file_count='multiple',interactive=False,visible=False,elem_id='clip-share-download',elem_classes=['rig-download-source'])
-                    clip_meta=gr.HTML(elem_id='clip-metadata')
-                with gr.Accordion('Open a saved recipe',open=False,elem_id='initial-open-recipe'):
-                    initial_recipe=gr.File(label='Saved recipe ZIP',type='filepath',file_types=['.zip'],elem_classes=['rig-input-file'])
-                    initial_recipe_open=gr.Button('Open recipe')
-            with gr.Tab("Make a clip",id="make",elem_id="make-tab"):
-                with gr.Column(elem_id='motion-generation') as motion_generation:
-                    animation_source = gr.Radio(ANIMATION_SOURCES,value='Working source',label='Animation input')
-                    with gr.Row(elem_id='motion-frame-row'):
-                        animation_upload = gr.File(label='Start frame (choose Uploaded frame above)',type='filepath',file_types=['image'],height=112,min_width=0,elem_id='motion-start-frame',elem_classes=['rig-input-file'])
-                        animation_middle = gr.File(label='Middle frame (optional)',type='filepath',file_types=['image'],height=112,min_width=0,elem_classes=['rig-input-file'])
-                        animation_end = gr.File(label='End frame (optional)',type='filepath',file_types=['image'],height=112,min_width=0,elem_classes=['rig-input-file'])
-                    gr.Markdown("**2 · Create motion**",elem_id="motion-create-heading")
-                    animation_length=gr.Radio(motion_length.choices(),value=motion_length.STANDARD,label='Length',elem_id='motion-length')
-                    motion_prompt = gr.Textbox(label='Small movement to test',lines=2,value='A restrained continuous portrait shot. Very slight breathing and subtle movement in the surroundings. Keep the subject appearance and framing consistent. No dialogue.')
-                    camera_choice=gr.Radio([c for c in camera_control.CHOICES if '(untested)' not in c],value='None',label='Camera',elem_id='camera-choice')
-                    camera_pin=gr.Checkbox(value=False,interactive=False,label='Pin the end of the move',elem_id='camera-pin')
-                    camera_amount=gr.Slider(10,35,value=25,step=1,label='Amount (%)',visible=False,elem_id='camera-amount')
-                    with gr.Row():
-                        animation_seed = gr.Number(value=20261013,precision=0,label='Animation seed')
-                        animate_button = gr.Button('Animate one study — 1 backend job',elem_id='animate-button')
-                    gr.Markdown('Add a middle frame for a longer clip. Motion can change identity and details.')
-                    animation_recipe = gr.File(label='Animation recipe',interactive=False,elem_id='animation-recipe',elem_classes=['rig-download-source'])
-            with gr.Tab("Stills",id="stills",elem_id="stills-tab") as stills_tab:
-                with gr.Accordion("1 · Frame", open=True, elem_id="frame-builder") as frame_builder:
-                    with gr.Row():
+            with gr.Tab("Use my clip",id="direct",elem_id="motion-tab") as motion_tab:
+                clip_method = gr.Radio([('Start / end', 'Depth focus'), ('Pick details', 'Area sequence')], value='Depth focus', label='Focus method', elem_id='clip-method')
+                with gr.Column(visible=False, elem_id='area-director') as area_director:
+                    area_state = detail_focus.build_ui()
+                with gr.Column(elem_id='depth-director') as depth_director:
+                    gr.Markdown('**1 · Your clip**',elem_id='clip-source-heading')
+                    with gr.Row(elem_id='clip-source-fields'):
+                        phone_clip=gr.File(label='Drop a clip (MP4 or MOV)',type='filepath',file_types=['.mp4','.mov'],height=125,min_width=0,elem_id='phone-clip-upload',elem_classes=['rig-input-file'],scale=3)
+                        clip_study_button=gr.Button('No clip? Try ours',elem_id='clip-study-button',scale=1,min_width=140,interactive=(ROOT/'examples/arrival/arrival_recipe.zip').is_file())
+                    change_clip_button=gr.Button('Change clip',elem_id='change-clip-button',size='sm')
+                    with gr.Column(visible=False,elem_id='clip-workbench') as clip_workbench:
+                        with gr.Column(elem_id='clip-layout'):
+                            gr.Markdown("**2 · Tap what's sharp**",elem_id='clip-aim-heading')
+                            with gr.Row(elem_id='clip-endpoints'):
+                                clip_start=gr.Image(label="Start: tap what's sharp",type='pil',interactive=False,format='png',buttons=[],min_width=0,elem_id='clip-start')
+                                clip_end=gr.Image(label="End: tap what's sharp",type='pil',interactive=False,format='png',buttons=[],min_width=0,elem_id='clip-end')
+                            with gr.Column(min_width=0,elem_id='clip-controls'):
+                                gr.Markdown('**3 · Direct it**')
+                                clip_direct_button=gr.Button('Direct it',interactive=False,variant='primary',elem_id='clip-direct-button')
+                                clip_cost=gr.Markdown(elem_id='clip-cost')
+                                clip_status=gr.HTML(elem_id='clip-status')
+                        with gr.Accordion('More controls',open=False,elem_id='clip-more-controls'):
+                            clip_aperture=gr.Slider(0,100,value=100,step=1,label='Blur',elem_id='clip-aperture')
+                            gr.HTML('<div class="slider-ends"><span>Subtle</span><span>Strong</span></div>')
+                            clip_middle=gr.Radio(clip_flow.MIDDLE,value=clip_focus.HEAD,label='In between',elem_id='clip-middle')
+                            gr.Markdown('Face follow aims at the top of the subject. It can miss small or hidden faces.',elem_id='clip-follow-help')
+                            clip_landing=gr.Slider(50,95,value=85,step=1,label='When focus arrives',elem_id='clip-landing')
+                            gr.HTML('<div class="slider-ends"><span>Early</span><span>Late</span></div>')
+                            clip_guide=gr.Slider(0,100,value=60,step=1,label='Spotlight',info="Darkens what's out of focus",elem_id='clip-guide')
+                            clip_edge_cleanup=gr.Slider(0,1,value=.5,step=.05,label='Edge cleanup',info='Feathers thin edges toward nearby solid depth. 0 keeps the previous render.',elem_id='clip-edge-cleanup')
+                            with gr.Column(min_width=0,elem_id='clip-timeline'):
+                                gr.Markdown('**Focus over time**')
+                                clip_plot=gr.HTML(clip_focus.plot(None),elem_id='clip-plot')
+                            with gr.Accordion('Open a saved recipe',open=False):
+                                clip_recipe_upload=gr.File(label='Saved recipe ZIP',type='filepath',file_types=['.zip'],elem_id='clip-recipe-upload',elem_classes=['rig-input-file'])
+                                clip_import_button=gr.Button('Open recipe',elem_id='clip-import-button')
+                        with gr.Column(visible=False,elem_id='clip-result') as clip_result:
+                            gr.Markdown('**Your directed clip**')
+                            with gr.Column(min_width=0,elem_id='clip-viewer'):
+                                clip_toggle=gr.Radio([('Before','Sharp'),('After','Focus-directed')],value='Sharp',show_label=False,interactive=False,elem_id='clip-toggle')
+                                with gr.Row(elem_id='clip-videos'):
+                                    animation_video=gr.Video(show_label=False,interactive=False,include_audio=False,loop=True,elem_id='clip-sharp',min_width=0,buttons=[])
+                                    clip_compare=gr.Video(show_label=False,interactive=False,include_audio=False,loop=True,elem_id='clip-comparison',min_width=0,buttons=[])
+                                with gr.Row(elem_id='clip-result-actions',elem_classes=['rig-download-source']):
+                                    clip_share_button=gr.Button('Share',variant='primary',elem_id='clip-share-button')
+                                    gr.HTML('<div class="rig-download-buttons"><button type="button" data-rig-video-download="clip-comparison" disabled>Download</button></div>',elem_id='clip-download-actions')
+                            with gr.Accordion('More downloads',open=False,elem_id='clip-more-downloads'):
+                                gr.HTML('<div class="rig-download-source rig-download-buttons"><button type="button" data-rig-video-download="clip-sharp" disabled>Download original clip</button></div>')
+                                clip_save_button=gr.Button('Save recipe (.zip)',elem_id='clip-save-button')
+                                clip_recipe_download=gr.File(label='Saved recipe',interactive=False,visible=False,elem_id='clip-recipe-download',elem_classes=['rig-download-source'])
+                                clip_share_download=gr.File(label='Share files',file_count='multiple',interactive=False,visible=False,elem_id='clip-share-download',elem_classes=['rig-download-source'])
+                        clip_meta=gr.HTML(elem_id='clip-metadata')
+                    with gr.Accordion('Open a saved recipe',open=False,elem_id='initial-open-recipe'):
+                        initial_recipe=gr.File(label='Saved recipe ZIP',type='filepath',file_types=['.zip'],elem_classes=['rig-input-file'])
+                        initial_recipe_open=gr.Button('Open recipe')
+                clip_method.change(lambda mode: (gr.update(visible=mode == 'Area sequence'), gr.update(visible=mode == 'Depth focus')),
+                                   clip_method, [area_director, depth_director], queue=False, api_visibility='private')
+            with gr.Tab("Use my image",id="stills",elem_id="stills-tab") as stills_tab:
+                with gr.Accordion("1 · Your image", open=True, elem_id="frame-builder") as frame_builder:
+                    with gr.Row(elem_id="image-source-fields"):
+                        upload = gr.File(label="Drop an image", type="filepath", file_types=["image"],
+                                         elem_id="image-upload", elem_classes=['rig-input-file'], scale=3)
+                        bring_btn = gr.Button("Use this image", variant="primary", interactive=False,
+                                              elem_id="bring-button", scale=1, min_width=140)
+                    upload_preview = gr.Image(label="Your image", interactive=False, height=160,
+                                              visible=False, buttons=[], elem_id="image-upload-preview")
+                    gr.Markdown("Choose what stays sharp, compare looks, and keep your image and recipe.")
+                    with gr.Accordion("Open a saved image recipe", open=False, elem_id="image-open-recipe"):
+                        image_recipe_upload = gr.File(label="Image recipe ZIP", type="filepath", file_types=[".zip"],
+                                                      elem_classes=['rig-input-file'])
+                        image_recipe_open = gr.Button("Open image recipe", interactive=False)
+                        gr.Markdown("Restore your image, saved looks and focus settings. Opening uses no backend job.")
+                    with gr.Accordion("Image details", open=False):
+                        lens = gr.Radio([24, 35, 50, 85], value=50, label="Estimated lens (mm, full-frame equivalent)")
+                        gr.Markdown("Your original file stays in the recipe. Processing uses an oriented RGB copy up to 1600 px. The lens estimate controls focus depth and blur size.")
+                    with gr.Accordion("Or generate a new image", open=False, elem_id="image-generation"):
                         shot = gr.Dropdown(SHOT_CHOICES, value="Medium hero", label="Shot preset")
-                        lens = gr.Radio([24, 35, 50, 85], value=50, label="Lens (mm, full-frame equivalent)")
-                    with gr.Tab("Generate"):
                         engine = gr.Dropdown(['auto', *still_engines.ENGINES], value='auto', visible=False)
                         engine_selected = gr.Markdown("**Still engine:** checking availability")
                         with gr.Row(elem_id="engine-picker"):
                             engine_buttons = [gr.Button(v['label'], interactive=False) for v in still_engines.ENGINES.values()]
                         engine_status = gr.Markdown("Connect a backend to check available models.")
                         with gr.Row():
-                            still_resolution = gr.Radio(['2K', '1K'], value='2K', label='FLUX 3 size')
+                            image_format = gr.Radio(list(still_engines.FORMATS), value='Landscape', label='Format')
+                            still_resolution = gr.Radio(['2K', '1K'], value='2K', label='Image size',
+                                                        info='2K is about 4 MP; 1K is about 1 MP. Applies to every engine.')
+                        with gr.Row():
                             expand_prompt = gr.Checkbox(value=True, label='Expand prompt for FLUX 3', info='Keeps your style and depth instructions. Turn off to use your own full caption.')
                         scene = gr.Textbox(label="Scene", lines=2, placeholder="A street musician under the French Quarter gas lamps…")
                         with gr.Row():
                             seed = gr.Number(value=1102, precision=0, label="Seed", scale=1)
-                            shoot_btn = gr.Button("Shoot", variant="primary", elem_id="shoot-button", scale=1)
-                    with gr.Tab("Use my frame"):
-                        upload = gr.File(label="Original image", type="filepath", file_types=["image"],elem_classes=['rig-input-file'])
-                        gr.Markdown("Choose an estimated lens above. Your original file is kept in the recipe; processing uses an oriented RGB copy up to 1600 px.")
-                        upload_preview = gr.Image(label="Upload preview", interactive=False, height=160,buttons=[])
-                        bring_btn = gr.Button("Load frame", elem_id="bring-button")
-                    examples_panel = gr.Accordion("Scene starting points", open=False)
+                            shoot_btn = gr.Button("Generate image", elem_id="shoot-button", scale=1)
+                        examples_panel = gr.Accordion("Scene starting points", open=False)
 
                 with gr.Row(visible=False, elem_id="frame-summary-row") as frame_summary_row:
                     frame_summary = gr.Markdown()
@@ -1060,8 +1111,8 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
                         with gr.Column(elem_id="stage-empty-overlay", min_width=0):
                             stage_study_btn = gr.Button("Open the saved study — no backend job", variant="secondary", elem_id="stage-study-button")
                             stage_motion_study_btn = gr.Button("or see it move: open the saved clip study",variant="secondary",elem_id="stage-motion-study-button",interactive=(ROOT/"examples/arrival/arrival_recipe.zip").is_file())
-                            gr.Markdown("or shoot a frame, or bring your own, above")
-                        status = gr.Markdown("Bring a frame or open the saved study.", elem_id="frame-readout")
+                            gr.Markdown("or drop your own image above")
+                        status = gr.Markdown("Use your image or open the saved study.", elem_id="frame-readout")
                         stage_meta = gr.HTML("", elem_id="stage-metadata", visible=True)
                     with gr.Column(scale=1, min_width=260, elem_id="direct-controls"):
                         f_stop = gr.Radio(F_STOPS, value=1.4, label="Aperture", elem_id="aperture-control")
@@ -1104,8 +1155,27 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
                 with gr.Accordion("Pair export previews", open=False, visible=False, elem_id="pair-export-previews") as pair_previews:
                     pair_png = gr.Image(label="Labeled pair", interactive=False,buttons=['fullscreen'])
                     pair_video = gr.Video(label="A → B → A · 4 seconds", loop=True, autoplay=False,buttons=[])
-                gr.Markdown("Saved-take selection, view switches, Flip, downloads and pair exports run locally. Shoot, Load frame, Re-develop and clicking Frame run on the selected backend.", elem_id="cost-note")
+                gr.Markdown("Saved-take selection, view switches, Flip, downloads and pair exports run locally. Generate image, Use this image, Re-develop and clicking Frame run on the selected backend.", elem_id="cost-note")
 
+
+            with gr.Tab("Make a clip",id="make",elem_id="make-tab"):
+                with gr.Column(elem_id='motion-generation') as motion_generation:
+                    animation_source = gr.Radio(ANIMATION_SOURCES,value='Working source',label='Animation input')
+                    with gr.Row(elem_id='motion-frame-row'):
+                        animation_upload = gr.File(label='Start frame (choose Uploaded frame above)',type='filepath',file_types=['image'],height=112,min_width=0,elem_id='motion-start-frame',elem_classes=['rig-input-file'])
+                        animation_middle = gr.File(label='Middle frame (optional)',type='filepath',file_types=['image'],height=112,min_width=0,elem_classes=['rig-input-file'])
+                        animation_end = gr.File(label='End frame (optional)',type='filepath',file_types=['image'],height=112,min_width=0,elem_classes=['rig-input-file'])
+                    gr.Markdown("**2 · Create motion**",elem_id="motion-create-heading")
+                    animation_length=gr.Radio(motion_length.choices(),value=motion_length.STANDARD,label='Length',elem_id='motion-length')
+                    motion_prompt = gr.Textbox(label='Small movement to test',lines=2,value='A restrained continuous portrait shot. Very slight breathing and subtle movement in the surroundings. Keep the subject appearance and framing consistent. No dialogue.')
+                    camera_choice=gr.Radio([c for c in camera_control.CHOICES if '(untested)' not in c],value='None',label='Camera',elem_id='camera-choice')
+                    camera_pin=gr.Checkbox(value=False,interactive=False,label='Pin the end of the move',elem_id='camera-pin')
+                    camera_amount=gr.Slider(10,35,value=25,step=1,label='Amount (%)',visible=False,elem_id='camera-amount')
+                    with gr.Row():
+                        animation_seed = gr.Number(value=20261013,precision=0,label='Animation seed')
+                        animate_button = gr.Button('Animate one study — 1 backend job',elem_id='animate-button')
+                    gr.Markdown('Add a middle frame for a longer clip. Motion can change identity and details.')
+                    animation_recipe = gr.File(label='Animation recipe',interactive=False,elem_id='animation-recipe',elem_classes=['rig-download-source'])
 
         depth = gr.Textbox(visible=False)
         subject = gr.Textbox(visible=False)
@@ -1124,15 +1194,19 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
         queue=False,api_visibility="private")
     shot.input(shot_changed, shot, [lens, f_stop], api_visibility="private")
     lens.input(lambda: ANY_LENS, None, shot, api_visibility="private")
-    upload.change(lambda path: path, upload, upload_preview, queue=False, api_visibility="private")
-    shoot_btn.click(shoot, [scene, shot, lens, f_stop, stock, mode, hold, seed, guide, engine, still_resolution, expand_prompt], outs, **queue)
+    upload.change(lambda path: (gr.update(value=path, visible=bool(path)), gr.update(interactive=bool(path))),
+                  upload, [upload_preview, bring_btn], queue=False, api_visibility="private")
+    shoot_btn.click(shoot, [scene, shot, lens, f_stop, stock, mode, hold, seed, guide, engine, still_resolution, expand_prompt, image_format], outs, **queue)
     bring_btn.click(bring_frame, [upload, lens, f_stop, stock, mode, hold, guide], outs, **queue)
+    image_recipe_upload.change(lambda path: gr.update(interactive=bool(path)), image_recipe_upload,
+                               image_recipe_open, queue=False, api_visibility="private")
+    image_recipe_open.click(open_image_recipe, image_recipe_upload, outs, **queue)
     develop_btn.click(develop, [state, f_stop, stock, mode, hold, guide], outs, **queue)
     hero.select(focus_stage_click, [state, f_stop, stock, mode, hold, stage_view, guide], outs, **queue)
     compare_btn.click(compare, [state, what, f_stop, stock, mode, hold, guide], outs, **queue)
     recipe_btn.click(save_recipe_for_ui, state, recipe_file, **queue)
-    study_btn.click(open_study, None, outs, js="() => { window.heroRig?.showWorkflow('Stills'); window.heroRig?.startStudy(); return []; }", **queue)
-    stage_study_btn.click(open_study, None, outs, js="() => { window.heroRig?.showWorkflow('Stills'); window.heroRig?.startStudy(); return []; }", **queue)
+    study_btn.click(open_study, None, outs, js="() => { window.heroRig?.showWorkflow('Use my image'); window.heroRig?.startStudy(); return []; }", **queue)
+    stage_study_btn.click(open_study, None, outs, js="() => { window.heroRig?.showWorkflow('Use my image'); window.heroRig?.startStudy(); return []; }", **queue)
     change_frame_btn.click(lambda: (gr.update(visible=True, open=True), gr.update(visible=False)),
                            None, [frame_builder, frame_summary_row], queue=False, api_visibility="private")
     take_picker.input(choose_take, [state, take_picker], outs, **queue)
@@ -1146,7 +1220,7 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
     clip_outs=[clip_state,animation_video,clip_compare,clip_toggle,clip_start,clip_end,clip_middle,clip_landing,
                clip_aperture,clip_guide,clip_direct_button,clip_plot,clip_status,clip_workbench,clip_recipe_download,f_stop,guide,clip_meta,clip_edge_cleanup]
     clip_study_button.click(try_our_clip,None,clip_outs,**queue)
-    stage_motion_study_btn.click(try_our_clip,None,clip_outs,js="() => { window.heroRig?.showWorkflow('Direct a clip'); return []; }",**queue)
+    stage_motion_study_btn.click(try_our_clip,None,clip_outs,js="() => { window.heroRig?.showWorkflow('Use my clip'); return []; }",**queue)
     clip_import_button.click(open_simple_recipe,clip_recipe_upload,clip_outs,**queue)
     initial_recipe_open.click(open_simple_recipe,initial_recipe,clip_outs,**queue)
     phone_clip.upload(upload_for_direct,phone_clip,clip_outs,**queue)
@@ -1156,7 +1230,7 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
     camera_choice.change(camera_options,[camera_choice,animation_end],[camera_pin,camera_amount],queue=False,api_visibility="private")
     animation_end.change(camera_options,[camera_choice,animation_end],[camera_pin,camera_amount],queue=False,api_visibility="private")
     animate_button.click(animate_simple,[state,animation_source,animation_upload,motion_prompt,animation_seed,animation_end,animation_middle,lens,camera_choice,camera_pin,camera_amount,animation_length],
-                         clip_outs+[animation_recipe],**queue).then(None,None,None,js="() => { window.heroRig?.showWorkflow('Direct a clip'); }",queue=False,api_visibility="private")
+                         clip_outs+[animation_recipe],**queue).then(None,None,None,js="() => { window.heroRig?.showWorkflow('Use my clip'); }",queue=False,api_visibility="private")
     clip_start.select(simple_start,clip_state,[clip_state,clip_start,clip_status,clip_meta,clip_direct_button],**queue)
     clip_end.select(simple_end,clip_state,[clip_state,clip_end,clip_status,clip_meta,clip_direct_button],**queue)
     clip_toggle.change(None,clip_toggle,None,js="(view) => { window.heroRig?.flipClip(view); return []; }",queue=False,api_visibility="private")

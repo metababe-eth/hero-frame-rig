@@ -39,7 +39,7 @@
     const root = document.getElementById('hero-rig');
     const stage = document.getElementById('stage-image');
     if (!root) return;
-    root.dataset.workflow=[...document.querySelectorAll('#workflow-tabs [role="tab"]')].find(t=>t.getAttribute('aria-selected')==='true')?.textContent.trim() || 'Direct a clip';
+    root.dataset.workflow=[...document.querySelectorAll('#workflow-tabs [role="tab"]')].find(t=>t.getAttribute('aria-selected')==='true')?.textContent.trim() || 'Use my clip';
     clipUI.refresh(); downloads.refresh();
     if (!stage) return;
     document.documentElement.classList.add('dark');

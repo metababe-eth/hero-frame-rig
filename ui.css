@@ -162,7 +162,7 @@ html, body, .gradio-container { background:#0E0E10 !important; color:#ECE8E1 !im
 }
 
 /* Brief20: one source, two taps, one action. Stills retains its own layout. */
-#hero-rig:not([data-workflow="Stills"]) #study-button { display:none !important; }
+#hero-rig:not([data-workflow="Use my image"]) #study-button { display:none !important; }
 #make-tab { border:0 !important; padding:0 !important; }
 #clip-source-fields { align-items:center; flex-wrap:nowrap !important; gap:16px !important; }
 #clip-source-fields > * { min-width:0 !important; }

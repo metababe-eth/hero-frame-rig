@@ -46,7 +46,8 @@ def select_take(state, take_number):
             settings = take["settings"]
             return {**state, "selected_take": take["n"],
                     "focus": float(settings["focus_disparity"]),
-                    "label": int(settings.get("subject_label", 0))}
+                    "label": int(settings.get("subject_label", 0)),
+                    "focus_point": take.get("focus_point")}
     raise ValueError(f"Take {take_number} is not present in this frame.")
 
 
@@ -197,4 +198,7 @@ def load_study(recipe_path, directory):
     if original:
         state.update(original=original, original_name=original["filename"],
                      original_file=asset(original["archive_path"]))
+    if frame.get("source") == "generated":
+        state.update({key: frame[key] for key in ("image_format", "resolution")
+                      if frame.get(key) is not None})
     return select_take(state, 4)
