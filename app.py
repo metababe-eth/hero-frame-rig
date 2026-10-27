@@ -429,7 +429,7 @@ def open_image_recipe(path):
 def choose_take(state, take_number):
     """Select a saved take and restore its controls, without rendering or a backend job."""
     if not state or not state.get("takes"):
-        raise gr.Error("Shoot, load a frame, or open the saved study first.")
+        raise gr.Error("Upload or generate an image, or open a saved image recipe first.")
     try:
         state = select_take(state, int(take_number))
         state = {**state, "focus_point": ui_state.focus_point(state)}
@@ -975,6 +975,8 @@ THEME = gr.themes.Base(
     button_primary_background_fill="#C8361F", button_primary_background_fill_dark="#C8361F",
     button_primary_text_color="#FFFFFF", button_primary_text_color_dark="#FFFFFF",
 )
+HAS_IMAGE_STUDY = (ROOT / "examples/nola_study.zip").is_file()
+HAS_CLIP_STUDY = (ROOT / "examples/arrival/arrival_recipe.zip").is_file()
 preview_path = ROOT / "examples/nola-previews/take04.jpg"
 preview_url = "data:image/jpeg;base64," + base64.b64encode(preview_path.read_bytes()).decode("ascii") if preview_path.is_file() else ""
 UI_JS = (ROOT / "ui.js").read_text(encoding="utf-8").replace("__NOLA_PREVIEW__", json.dumps(preview_url)).replace(
@@ -991,7 +993,8 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
     with gr.Column(elem_id="hero-rig", elem_classes=["rig-empty", "rig-portrait"]):
         with gr.Row(elem_id="rig-topbar"):
             gr.HTML('<div class="brand">Hero Frame Rig <span>Hold the moment. Direct the focus.</span></div>')
-            study_btn = gr.Button("Explore saved study", variant="secondary", size="sm", elem_id="study-button", scale=0,interactive=(ROOT/'examples/nola_study.zip').is_file())
+            study_btn = gr.Button("Explore saved study", variant="secondary", size="sm", elem_id="study-button", scale=0,
+                                  visible=HAS_IMAGE_STUDY, interactive=HAS_IMAGE_STUDY)
 
         with gr.Accordion("Backend · local first, Cloud optional", open=False, elem_id="backend-settings"):
             with gr.Row():
@@ -1010,7 +1013,8 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
                     gr.Markdown('**1 · Your clip**',elem_id='clip-source-heading')
                     with gr.Row(elem_id='clip-source-fields'):
                         phone_clip=gr.File(label='Drop a clip (MP4 or MOV)',type='filepath',file_types=['.mp4','.mov'],height=125,min_width=0,elem_id='phone-clip-upload',elem_classes=['rig-input-file'],scale=3)
-                        clip_study_button=gr.Button('No clip? Try ours',elem_id='clip-study-button',scale=1,min_width=140,interactive=(ROOT/'examples/arrival/arrival_recipe.zip').is_file())
+                        clip_study_button=gr.Button('No clip? Try ours',elem_id='clip-study-button',scale=1,min_width=140,
+                                                    visible=HAS_CLIP_STUDY,interactive=HAS_CLIP_STUDY)
                     change_clip_button=gr.Button('Change clip',elem_id='change-clip-button',size='sm')
                     with gr.Column(visible=False,elem_id='clip-workbench') as clip_workbench:
                         with gr.Column(elem_id='clip-layout'):
@@ -1109,10 +1113,12 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
                         hero = gr.Image(label="Frame (click to focus)", show_label=False, interactive=False,
                                         format="png", container=False, elem_id="stage-image", buttons=[])
                         with gr.Column(elem_id="stage-empty-overlay", min_width=0):
-                            stage_study_btn = gr.Button("Open the saved study — no backend job", variant="secondary", elem_id="stage-study-button")
-                            stage_motion_study_btn = gr.Button("or see it move: open the saved clip study",variant="secondary",elem_id="stage-motion-study-button",interactive=(ROOT/"examples/arrival/arrival_recipe.zip").is_file())
-                            gr.Markdown("or drop your own image above")
-                        status = gr.Markdown("Use your image or open the saved study.", elem_id="frame-readout")
+                            stage_study_btn = gr.Button("Open the saved study — no backend job", variant="secondary", elem_id="stage-study-button",
+                                                        visible=HAS_IMAGE_STUDY, interactive=HAS_IMAGE_STUDY)
+                            stage_motion_study_btn = gr.Button("or see it move: open the saved clip study",variant="secondary",elem_id="stage-motion-study-button",
+                                                               visible=HAS_CLIP_STUDY,interactive=HAS_CLIP_STUDY)
+                            gr.Markdown("Drop your own image above, or open a saved image recipe.", elem_id="stage-empty-hint")
+                        status = gr.Markdown("Use your image or open a saved image recipe.", elem_id="frame-readout")
                         stage_meta = gr.HTML("", elem_id="stage-metadata", visible=True)
                     with gr.Column(scale=1, min_width=260, elem_id="direct-controls"):
                         f_stop = gr.Radio(F_STOPS, value=1.4, label="Aperture", elem_id="aperture-control")
