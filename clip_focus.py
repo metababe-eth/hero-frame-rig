@@ -43,7 +43,7 @@ def initialize(clip,lens=85,strength=1.0):
     sharp=directory/'sharp.mp4'
     subprocess.run(['ffmpeg','-v','error','-y','-i',str(clip),'-map','0:v:0','-c:v','copy','-an',str(sharp)],check=True)
     for name,index in [('first',0),('last',meta['frames']-1)]:
-        subprocess.run(['ffmpeg','-v','error','-y','-i',str(sharp),'-vf',f'select=eq(n\,{index})','-frames:v','1',str(directory/(name+'.png'))],check=True)
+        subprocess.run(['ffmpeg','-v','error','-y','-i',str(sharp),'-vf',fr'select=eq(n\,{index})','-frames:v','1',str(directory/(name+'.png'))],check=True)
     w,h=meta['width'],meta['height']
     state={'schema':SCHEMA,'id':uuid.uuid4().hex,'dir':str(directory),'sharp':str(sharp),
            'first':str(directory/'first.png'),'last':str(directory/'last.png'),**meta,
