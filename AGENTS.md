@@ -1,7 +1,7 @@
 # Contributor guidance
 
 Keep backend selection and entered credentials session-scoped. Hosted deployments
-require the caller's Comfy key; never bundle an owner key or set HFR_PRIVATE_HOSTED.
+require the caller's Comfy key; never bundle an owner key or enable a hosted owner-key fallback.
 Do not print, save or return credentials in logs, workflow graphs or recipe exports.
 Keep the app and ComfyUI-HeroFrameRig nodes on the same hfr_core implementation.
 Preserve recipe replay and edge_cleanup=0 compatibility. Run focused CPU tests

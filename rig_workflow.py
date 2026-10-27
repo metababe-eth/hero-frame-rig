@@ -157,9 +157,13 @@ def _matte_nodes(image_ref, start=22, prefix="rig/subject"):
     }
 
 
-def _to_linear(nid, ref):
-    return {nid: {"class_type": "HDRExpandDynamicRange", "_meta": {"title": "Linear light + bright lights"},
-                  "inputs": {"image": ref, **EXPAND}}}
+def _to_linear(nid, ref, photo=False):
+    expand = dict(EXPAND)
+    if photo:
+        expand["highlight_recovery"] = round_lens.PHOTO_HIGHLIGHT_RECOVERY
+    title = "Linear light / bounded photo highlights" if photo else "Linear light + bright lights"
+    return {nid: {"class_type": "HDRExpandDynamicRange", "_meta": {"title": title},
+                  "inputs": {"image": ref, **expand}}}
 
 
 def _lens(nid, image_ref, disp_ref, blur, focus_d, title=None):
@@ -249,7 +253,8 @@ def scan(image_name):
 
 
 def develop(still_name, disparity_name, blur, focus_d, stock="film", seed=7, layers=None,
-            round_masks=None, width=None, height=None, guide=0, guide_masks=None):
+            round_masks=None, width=None, height=None, guide=0, guide_masks=None,
+            photo_edges=False):
     """Re-develop a still with a disparity map (from optics) without re-rendering.
 
     blur = optics.blur_scale(lens_mm, f_stop, width, z_near, strength); focus_d = the
@@ -263,6 +268,8 @@ def develop(still_name, disparity_name, blur, focus_d, stock="film", seed=7, lay
     background plate; the layer is composited over the plate in linear light. The subject's
     colours never enter the background bokeh (no glow), and a held subject stays crisp.
     """
+    if photo_edges and (layers or round_masks is None):
+        raise ValueError("Photo edges require an unlayered round-lens graph with saved V2 masks.")
     guide = guide_eye.amount(guide)
     if guide and (round_masks is None or not guide_masks):
         raise ValueError("Guide requires a round-lens graph and saved guide masks.")
@@ -273,13 +280,14 @@ def develop(still_name, disparity_name, blur, focus_d, stock="film", seed=7, lay
                "_meta": {"title": "Subject layer disparity" if layers else "Disparity"},
                "inputs": {"image": disparity_name}},
     }
-    wf.update(_to_linear("30", ["20", 0]))
+    wf.update(_to_linear("30", ["20", 0], photo=photo_edges))
     def lens_branch(prefix, image_ref, disparity_ref, mask_group):
         if round_masks is None:
             wf.update(_lens(prefix, image_ref, disparity_ref, blur, focus_d))
             return [prefix, 0]
-        branch, output = round_lens.graph(image_ref, width, height, blur,
-                                          round_masks[mask_group], id_prefix=f"round_{prefix}")
+        builder = round_lens.photo_graph if photo_edges else round_lens.graph
+        branch, output = builder(image_ref, width, height, blur,
+                                 round_masks[mask_group], id_prefix=f"round_{prefix}")
         wf.update(branch)
         return output
 
@@ -317,7 +325,8 @@ def develop(still_name, disparity_name, blur, focus_d, stock="film", seed=7, lay
     wf["32"] = {"class_type": "SaveImage", "_meta": {"title": "Save hero frame"},
                 "inputs": {"images": ["36", 0], "filename_prefix": "rig/hero"}}
     if round_masks is not None:
-        wf["32"]["_meta"]["title"] = "Save hero frame / " + round_lens.VERSION
+        version = round_lens.PHOTO_VERSION if photo_edges else round_lens.VERSION
+        wf["32"]["_meta"]["title"] = "Save hero frame / " + version
     if guide:
         wf["32"]["_meta"]["title"] += " / " + guide_eye.VERSION
     return wf

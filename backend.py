@@ -36,22 +36,9 @@ def config():
     return dict(_active.get() or defaults())
 
 
-def _private_host():
-    """Fail closed if the private Space is made public or its status cannot be checked."""
-    space = os.getenv('SPACE_ID', '')
-    if not space or os.getenv('HFR_PRIVATE_HOSTED') != '1':
-        return False
-    try:
-        # An unauthenticated Hub read hides private Spaces. Public copies return 200.
-        r = httpx.get('https://huggingface.co/api/spaces/' + space, timeout=8)
-        return r.status_code in (401, 404)
-    except httpx.HTTPError:
-        return False
-
-
 def cloud_key(cfg):
     key = cfg.get('key', '').strip()
-    if not key and (_private_host() or cfg.get('loopback', False)):
+    if not key and not os.getenv('SPACE_ID') and cfg.get('loopback', False):
         with _lock:
             key = os.getenv('COMFY_API_KEY', '').strip()
     if not key.startswith('comfyui-'):

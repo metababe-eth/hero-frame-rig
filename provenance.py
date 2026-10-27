@@ -4,7 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 SOURCE_FILES = ("app.py", "rig_workflow.py", "round_lens.py", "guide_eye.py", "optics.py", "frame_input.py",
-                "review_state.py", "provenance.py", "validate_recipe.py",
+                "review_state.py", "image_recipe.py", "provenance.py", "validate_recipe.py",
                 "animation_workflow.py", "animation_input.py", "rack_focus.py",
                 "workflows/ltx_sharp_recovered.json",
                 "requirements.txt", "requirements-local.txt", "README.md", "DEPENDENCIES.md")

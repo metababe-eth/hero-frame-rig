@@ -24,13 +24,62 @@ This is an independent project, with no affiliation or endorsement from Higgsfie
 The reference is its publicly observed lens/aperture controls and rack-focus prompt
 chip; we have not tested its output quality or ruled out its post-generation tools.
 
-## How it works in five lines
+## Features shown in the demo
+
+- **Use my clip:** bring your own footage, keeping its source for comparison.
+- **Start / end:** tap what should be sharp at each end, then direct the focus.
+- **Pick details:** choose three areas and **Direct these details**, locally.
+- **Save / Reopen:** keep clip and Area recipes with their source, settings and result; reopen them to continue. Saved image recipes restore the original and saved takes too.
+- **Use my image:** bring a photo, choose focus and a treatment, compare looks and export the image plus its recipe. Generated stills also offer landscape, portrait and square formats.
+- **Make a clip:** animate an image, then direct the resulting clip.
+
+Demo: [DEMO_URL]
+
+The app's default motion model is **LTX-2.3**. The locked demo also uses footage
+made with **LTX-2.5 on Comfy Cloud**. Its dialogue-production models are demo-media
+credits, not voice features installed in the app; see [MODEL_LICENSES.md](MODEL_LICENSES.md).
+
+## How Depth focus works in five lines
 
 1. Upload your own frame/clip, or generate a still with an available engine and motion with LTX-2.3.
 2. Depth Anything 3 estimates distance; optional BiRefNet subject analysis supplies a head target.
 3. Choose two focus points and a timing; the saved shot and its motion stay the same.
 4. One shared CPU core applies depth-directed blur, edge cleanup and optional spotlight grading.
 5. Compare Before/After, download the clip, and export source, depth, settings and a ComfyUI workflow.
+
+For stills, **Use my image → Open a saved image recipe** restores the original,
+cached depth and all saved takes without a backend job. See the
+[image recipe guide](workflows/IMAGE_RECIPE_REOPEN.md). New uploaded-photo takes
+with Subject layer off use [softened focus edges](workflows/PHOTO_EDGES.md);
+previous takes retain their original pixels and rendering graphs.
+
+## Area sequence: choose three details
+
+In **Use my clip → Pick details**, upload a clip and click one detail in each
+of three representative frames. The frames come from 6.25%, 37.5% and 65.625%
+of the clip; each label shows its actual timestamp. **Direct these details** moves
+attention from Detail 1 to Detail 2 to Detail 3. Adjust each area's size, blur,
+arrival times and pull duration, and optionally resolve the whole frame at the end.
+The result appears beside the source for a Before/After comparison.
+
+This local CPU effect preserves the source inside each sharp area and applies
+feathered Gaussian blur around it. Its targets are fixed image coordinates: it
+does not track subjects, estimate depth, regenerate imagery or recover detail
+already missing from a source. The existing Depth focus workflow remains available.
+Area sequence needs FFmpeg and the app's Python dependencies, but no model,
+ComfyUI connection or cloud job.
+
+Accepted clips are MP4/MOV/M4V, up to 250 MB, 12 seconds and 288 frames at a
+constant frame rate. Preparation keeps the complete frame count and native frame
+rate, scales down only when needed to an even-sized maximum 1280-pixel long side,
+and creates a muted H.264 working copy. The original upload is retained unchanged.
+**Save area recipe** packages that original, the prepared source, rendered result
+and validated settings in a bounded ZIP. **Open saved area recipe** restores the
+three selections, controls and existing result without rendering again; the ZIP
+reader accepts only the expected files and verifies their sizes and checksums.
+
+Area UI events are private, and the existing `/direct_clip` and `/shoot_still` API contracts are
+unchanged. Run its focused checks with `python -m unittest test_detail_focus -v`.
 
 ## Run on your own ComfyUI
 
@@ -39,8 +88,8 @@ Python environment separate from your GPU ComfyUI environment. Start ComfyUI as
 usual; its default address is `http://127.0.0.1:8188`.
 
 ```powershell
-git clone https://huggingface.co/spaces/metababa/hero-frame-rig-release
-cd hero-frame-rig-release
+git clone [PUBLIC_GITHUB_URL]
+cd hero-frame-rig
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -49,8 +98,7 @@ $env:COMFY_LOCAL_URL = "http://127.0.0.1:8188"
 python app.py
 ```
 
-This release candidate is private pending maintainer review. Authorized Hugging Face
-access is currently required to clone. On macOS/Linux activate with `source .venv/bin/activate` and use
+The public clone URL and demo link remain placeholders until release approval. On macOS/Linux activate with `source .venv/bin/activate` and use
 `export HFR_BACKEND=local`. The app manages the official loopback-only
 `comfy-api-proxy`, adapting standard ComfyUI to the SDK's v2 API. It exits with the
 app. Select **Local ComfyUI → Connect / refresh models** in Backend.
@@ -71,12 +119,12 @@ Cloud does depth/generation work; directed-clip focus runs on the app host CPU.
 A cached clip can be redirected without another Cloud job. Fresh `/direct_clip`
 analysis is one Cloud job; `/shoot_still` is one. Failed calls do not auto-retry.
 
-A loopback-only local session can use its own `COMFY_API_KEY` environment variable.
-Public origins require BYOK. The private Space's owner-key fallback is gated by
-`HFR_PRIVATE_HOSTED=1` and a private-visibility check; remove that flag **and the
-owner secret before public release**. Public metadata disables the fallback.
-No key is serialized into workflows or recipes. A hosted Space cannot reach your
-PC at localhost; run the app on your computer to use local ComfyUI.
+A loopback-only local run can use its own `COMFY_API_KEY` environment variable.
+Every hosted Cloud request requires the visitor's session key or API header;
+there is no hosted owner-key fallback, including on a private Space. Local Area
+focus and saved-recipe viewing do not need a Cloud key. No key is serialized into
+workflows or recipes. A hosted Space cannot reach your PC at localhost; run the
+app on your computer to use local ComfyUI.
 
 ## Install the node pack
 
@@ -143,7 +191,7 @@ import os
 from gradio_client import Client, handle_file
 from huggingface_hub import get_token
 
-client = Client("metababa/hero-frame-rig", token=get_token(),
+client = Client("metababa/hero-frame-rig-release", token=get_token(),
                 headers={"X-Comfy-API-Key": os.environ["COMFY_API_KEY"]})
 directed, share, recipe = client.predict(
     video=handle_file("clip.mp4"), start_x=.25, start_y=.45,
@@ -213,5 +261,5 @@ See [the detailed licence list](MODEL_LICENSES.md) for text encoders, VAEs, matt
 model and runtime dependencies. Open weights does not mean every model is under
 an OSI open-source licence. No weights or runtime binaries are redistributed.
 
-This code-only release candidate is private while the maintainer reviews deployment
-and the demo. No sample media or owner credentials are bundled.
+This code-only release candidate is private pending review. No demo media, model
+weights, owner credentials or internal submission drafts are bundled.

@@ -32,6 +32,8 @@ ALLOWED_CLASSES = frozenset({
 })
 
 ROUND_GRAPH_VERSION = "core-round-gaussian-legacy-footprint-v1"
+PHOTO_GRAPH_VERSION = "core-round-gaussian-photo-v2"
+ROUND_GRAPH_VERSIONS = (ROUND_GRAPH_VERSION, PHOTO_GRAPH_VERSION)
 
 
 def inspect_round_graph(graph):
@@ -44,7 +46,15 @@ def inspect_round_graph(graph):
     """
     errors, expected = [], set()
     title = graph.get("32", {}).get("_meta", {}).get("title")
-    guided = title == "Save hero frame / " + ROUND_GRAPH_VERSION + " / " + guide_eye.VERSION
+    versions = {"Save hero frame / " + version: (version, False) for version in ROUND_GRAPH_VERSIONS}
+    versions.update({"Save hero frame / " + version + " / " + guide_eye.VERSION: (version, True)
+                     for version in ROUND_GRAPH_VERSIONS})
+    version, guided = versions.get(title, (None, False))
+    if version is None:
+        errors.append("Round graph is missing the exact supported rendering-version marker.")
+    photo = version == PHOTO_GRAPH_VERSION
+    if photo and "39" in graph:
+        errors.append("Photo V2 is only supported for unlayered photographs.")
     guide_values = []
 
     def node(node_id, kind, connections=None, literals=None):
@@ -117,7 +127,11 @@ def inspect_round_graph(graph):
 
     node("20", "LoadImage")
     node("21", "LoadImage")
-    node("30", "HDRExpandDynamicRange", {"image": ["20", 0]})
+    photo_expand = {"source_gamma": 2.2, "highlight_recovery": 0.0, "black_point": 0.0,
+                    "target_stops": 11.0, "highlight_rolloff": 1.0} if photo else None
+    actual_expand = node("30", "HDRExpandDynamicRange", {"image": ["20", 0]}, photo_expand)
+    if photo and set(actual_expand) != {"image", *photo_expand}:
+        errors.append("Photo V2 linear conversion contains unexpected inputs.")
     subject = branch("31", ["30", 0])
     subject = guidance(subject, "subject" if "39" in graph else "main")
     lens_output = subject
@@ -138,8 +152,6 @@ def inspect_round_graph(graph):
     node("35", "RadianceFilmGrain", {"image": ["34", 0]})
     node("36", "HDRToneMap", {"image": ["35", 0]})
     node("32", "SaveImage", {"images": ["36", 0]})
-    if not guided and title != "Save hero frame / " + ROUND_GRAPH_VERSION:
-        errors.append("Round graph is missing the exact supported rendering-version marker.")
     if len(set(guide_values)) > 1:
         errors.append("Guide amount differs between colour layers.")
     for node_id in sorted(set(graph) - expected):
@@ -288,8 +300,8 @@ def inspect_graph(graph, schemas=None):
         errors.append("Develop replay requires exactly one SaveImage output.")
     has_round_nodes = any(n["class_type"] in {"ImageBlur", "ImageScale", "RadianceGrade"} for n in graph.values())
     round_marked = graph.get("32", {}).get("_meta", {}).get("title") in {
-        "Save hero frame / " + ROUND_GRAPH_VERSION,
-        "Save hero frame / " + ROUND_GRAPH_VERSION + " / " + guide_eye.VERSION}
+        "Save hero frame / " + version + suffix for version in ROUND_GRAPH_VERSIONS
+        for suffix in ("", " / " + guide_eye.VERSION)}
     if has_round_nodes or round_marked:
         errors.extend(inspect_round_graph(graph))
     elif not loads or not any(n["class_type"] == "RadianceDepthOfField" for n in graph.values()):
