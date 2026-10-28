@@ -18,7 +18,7 @@ short_description: Direct the focus of any clip after it's made.
 “Other tools ask the model to rack focus. Hero Frame Rig lets you decide after it's made, and change your mind.”
 
 By **Max Krane** for the [Open Source Higgsfield](https://comfy.org/open-source-higgsfield) competition.
-Code: <https://github.com/metababe-eth/hero-frame-rig> · Try it: <https://huggingface.co/spaces/metababa/hero-frame-rig-release> (bring your own Comfy key, or run it locally)
+Code: <https://github.com/metababe-eth/hero-frame-rig> · Try it free, no key: <https://huggingface.co/spaces/metababa/hero-frame-rig-playground> · Full app (bring your own Comfy key, or run it locally): <https://huggingface.co/spaces/metababa/hero-frame-rig-release>
 
 Bring a clip you care about. Tap what should be sharp at the start and end, compare
 the treatment with your original, and keep the clip plus a replayable recipe.
@@ -101,7 +101,7 @@ $env:COMFY_LOCAL_URL = "http://127.0.0.1:8188"
 python app.py
 ```
 
-The public clone URL and demo link remain placeholders until release approval. On macOS/Linux activate with `source .venv/bin/activate` and use
+On macOS/Linux activate with `source .venv/bin/activate` and use
 `export HFR_BACKEND=local`. The app manages the official loopback-only
 `comfy-api-proxy`, adapting standard ComfyUI to the SDK's v2 API. It exits with the
 app. Select **Local ComfyUI → Connect / refresh models** in Backend.
