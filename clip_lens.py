@@ -88,6 +88,8 @@ def panel(state):
                 ends=directing.nudge_depth(ends,cfg)
             a,b=state['points'];w,h=state['width'],state['height']
             warning=directing.depth_warning(ends,a[0]/(w-1),a[1]/(h-1),b[0]/(w-1),b[1]/(h-1))['message']
+            if warning:
+                warning+=' For more separation, use **More controls → Adjust a depth region**.'
     else:
         warning='Depth feedback appears after the first analysis. Further changes reuse the saved depth.'
         if nudge:readout='Region selected. Its depth mask appears after analysis.'

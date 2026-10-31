@@ -27,6 +27,28 @@ This is an independent project, with no affiliation or endorsement from Higgsfie
 The reference is its publicly observed lens/aperture controls and rack-focus prompt
 chip; we have not tested its output quality or ruled out its post-generation tools.
 
+## What's new (resubmission, Nov 2026)
+
+- **Optical focus:** a gentler f/2.8 starting point, round-disc blur in linear
+  light, eased rack timing and temporal depth smoothing. Breathing stays off.
+- **Subtle / Cinematic / Dramatic:** one tap sets aperture and arrival time.
+  New interactive clip sessions start Cinematic; old recipes retain Legacy.
+- **Depth correction:** an advisory when taps have similar estimated depth,
+  plus **More controls → Adjust a depth region** for a reversible Nearer/Farther
+  nudge. Its feathered region stays at its screen position; it does not track
+  objects. The recipe saves the original depth and exact correction separately.
+- **Playground:** the same Optical core, eight approved clips, preset buttons
+  and synchronized Original | Focus playback, stacked on phones.
+
+![Focus presets and depth guidance in the full app](https://huggingface.co/spaces/metababa/hero-frame-rig-playground/resolve/main/media/docs/release-optical.jpg)
+
+![Original and Optical focus on the same Walkie motion](https://huggingface.co/spaces/metababa/hero-frame-rig-playground/resolve/main/media/docs/optical-comparison.gif)
+
+The preview is silent and plays at the source speed. These documentation images
+are hosted with the Playground; this repository remains code-only. The linked
+63-second demo below is the unchanged V14 cut. See the
+[Optical notes](ComfyUI-HeroFrameRig/OPTICAL.md) for calibration and replay limits.
+
 ## Features shown in the demo
 
 - **Use my clip:** bring your own footage, keeping its source for comparison.
@@ -46,8 +68,8 @@ credits, not voice features installed in the app; see [MODEL_LICENSES.md](MODEL_
 
 1. Upload your own frame/clip, or generate a still with an available engine and motion with LTX-2.3.
 2. Depth Anything 3 estimates distance; optional BiRefNet subject analysis supplies a head target.
-3. Choose two focus points and a timing; the saved shot and its motion stay the same.
-4. One shared CPU core applies depth-directed blur, edge cleanup and optional spotlight grading.
+3. Choose two focus points and a preset or custom timing; the saved shot and its motion stay the same.
+4. One shared CPU core applies the selected lens treatment, depth cleanup and optional spotlight grading.
 5. Compare Before/After, download the clip, and export source, depth, settings and a ComfyUI workflow.
 
 For stills, **Use my image → Open a saved image recipe** restores the original,
@@ -207,6 +229,10 @@ client.close()
 `in_between='face'` (`closest`/`stay`), `blur=1`, `arrival=7/9`, `spotlight=60`,
 `edge_cleanup=.5`. The existing in-between default is unchanged. Arrival 0–1 maps
 to 50–95% of the clip. Returns directed MP4, muted portrait Share MP4, recipe ZIP.
+New API calls use Optical; the API's existing strong-blur, face-follow and
+spotlight defaults are retained. For the interactive Cinematic starting point,
+pass `in_between='stay', blur=2/3, arrival=4/9, spotlight=0`. Exact saved Legacy
+recipes remain replayable with the node pack.
 The upload path takes the first 97 frames at 25 fps (3.88 seconds), preserves aspect
 within 1280 pixels / 901120 pixels total, does not upscale, and removes audio.
 Share plays the comparison twice and crops around the end focus point.
@@ -224,17 +250,22 @@ Directed recipes contain `workflow.json`, `sharp.mp4`, exact float `hfr_depth.np
 taps, schedule, seed, edge setting, graphs and job receipts. Put the two inputs
 in ComfyUI/input and submit the workflow with the pack installed. Older recipes
 without an edge setting reopen at **0**, preserving the previous treatment;
-new clips default to **0.5**. Video codecs can introduce small pixel differences.
+new clips default to **0.5**. An absent lens mode remains Legacy. Optical recipes
+also store the aperture, virtual lens calibration, smoothing, breathing and any
+resolved depth-region correction. Video codecs can introduce small differences;
+replay checks compare decoded pixels as well as saved settings.
 
 This is **depth-directed focus, not real optics**. It cannot recover detail already
 blurred in a source or repair malformed generated motion. Prompt-based lens framing
 can regenerate composition. Depth estimates can fail at mirrors, transparency,
 hair and occlusions. Face follow uses a subject-top heuristic, not recognition.
-The no-model edge pass looks for RGB structure beside a nearer solid depth region,
+The Legacy edge pass looks for RGB structure beside a nearer solid depth region,
 then feathers the owning region's blur treatment instead of interpolating depth
 through the focus plane. It is a local heuristic, not a glass/material classifier.
-Use **More controls → Edge cleanup** (0–1); 0 exactly bypasses the new pass.
-The same setting is on Focus Pull and Beat Focus. The still-test harness uses the
+Optical uses RGB-guided depth cleanup before its layered disc blur. Use
+**More controls → Edge cleanup** (0–1); 0 disables cleanup within the selected
+mode. It does not switch Optical back to Legacy. The same control is on Focus
+Pull and Beat Focus; Beat Focus retains its Legacy treatment. The still-test harness uses the
 shared node core; the separate legacy Stills development graph is unchanged.
 The renderer is CPU-bound and large batches use RAM. No new model weights are added.
 

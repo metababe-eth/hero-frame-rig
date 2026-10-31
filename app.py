@@ -1076,7 +1076,7 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
                             clip_landing=gr.Slider(50,95,value=70,step=1,label='When focus arrives',elem_id='clip-landing')
                             gr.HTML('<div class="slider-ends"><span>Early</span><span>Late</span></div>')
                             clip_guide=gr.Slider(0,100,value=0,step=1,label='Spotlight',info="Darkens what's out of focus",elem_id='clip-guide')
-                            clip_edge_cleanup=gr.Slider(0,1,value=.5,step=.05,label='Edge cleanup',info='Feathers thin edges toward nearby solid depth. 0 keeps the previous render.',elem_id='clip-edge-cleanup')
+                            clip_edge_cleanup=gr.Slider(0,1,value=.5,step=.05,label='Edge cleanup',info='Refines depth boundaries for the selected lens mode. 0 disables cleanup; Legacy remains a separate mode.',elem_id='clip-edge-cleanup')
                             with gr.Accordion('Adjust a depth region',open=False,elem_id='clip-depth-adjust'):
                                 gr.Markdown('Tap the area whose depth needs correction. The highlight shows what will change. This region stays at its screen position; it does not track an object.')
                                 clip_nudge_frame=gr.Radio(['Start','End'],value='Start',label='Preview frame',elem_id='clip-nudge-frame')

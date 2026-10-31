@@ -61,9 +61,12 @@ class AgentAPI:
         in_between: face (default, top-of-subject heuristic; not face recognition),
         closest (nearest central depth), or stay (hold starting depth until the pull).
         blur: 0 subtle (f/5.6) to 1 strong (f/1.4), default 1.
-        arrival: 0 early (50% of clip) to 1 late (95%); default 7/9 gives the UI's 85%.
+        arrival: 0 early (50% of clip) to 1 late (95%); default 7/9 gives 85%.
+        New requests use Optical. For Cinematic: stay, blur=2/3, arrival=4/9,
+        spotlight=0. The existing API defaults remain independent of UI presets.
         spotlight: 0–100, default 60; darkens out-of-focus areas.
-        edge_cleanup: 0–1, default .5; feathers local edge ownership. 0 uses the previous renderer.
+        edge_cleanup: 0–1, default .5; RGB-guided depth cleanup in Optical.
+        0 bypasses cleanup within the selected lens mode; it does not select Legacy.
 
         Matches Direct a clip upload: first 97 frames at 25 fps (up to 3.88 s),
         aspect preserved, at most 1280 px long side / 901120 pixels, no upscaling,

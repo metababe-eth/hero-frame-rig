@@ -176,5 +176,26 @@ class OpticalFocusTests(unittest.TestCase):
         expected=core.render(rgb,d,focus_curve=curve,**chosen)
         self.assertTrue(torch.equal(expected,actual))
 
+    def test_shipped_cached_example_executes_optical_settings(self):
+        import types
+        spec=importlib.util.spec_from_file_location('optical_example_pack',ROOT/'ComfyUI-HeroFrameRig/__init__.py',
+            submodule_search_locations=[str(ROOT/'ComfyUI-HeroFrameRig')])
+        pack=importlib.util.module_from_spec(spec);sys.modules[spec.name]=pack;spec.loader.exec_module(pack)
+        graph=json.loads((ROOT/'ComfyUI-HeroFrameRig/example_workflows/cached_depth_cpu.json').read_text())
+        node=pack.NODE_CLASS_MAPPINGS[graph['4']['class_type']]()
+        options={k:v for k,v in graph['4']['inputs'].items() if k not in ('images','depth')}
+        self.assertEqual(options['lens_mode'],'optical')
+        self.assertEqual(options['aperture'],2.8)
+        self.assertAlmostEqual(50+45*options['arrival'],70)
+        rgb=torch.rand((9,24,32,3),generator=torch.Generator().manual_seed(43))
+        d=torch.linspace(.95,.1,32)[None,None,:].expand(9,24,32)
+        progress=lambda n:types.SimpleNamespace(update_absolute=lambda *args:None)
+        with patch.dict(sys.modules,{'comfy':types.ModuleType('comfy'),
+             'comfy.utils':types.SimpleNamespace(ProgressBar=progress)}):
+            result=node.execute(rgb,d,**options)[0]
+        options.pop('depth_nudge_json')
+        self.assertTrue(torch.equal(result,core.render(rgb,d,**options)))
+        self.assertEqual(pack.__version__,core.__version__)
+
 
 if __name__=='__main__': unittest.main()

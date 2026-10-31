@@ -3,9 +3,10 @@
 Optical is explicitly selected with `lens_mode="optical"`. The default of the
 renderer, node and older recipe paths stays `legacy`. New clip sessions in the
 locally staged app start with Optical / Cinematic. No public deployment has
-changed. Maxwell selected Optical on seven of eight Part 1 clips; Walkie's
-truck needs a depth correction. That correction still needs visual acceptance,
-and a live cpu-basic benchmark is pending.
+changed. Maxwell selected Optical on all eight showcase clips, including the
+narrower Walkie truck correction accepted in review 43B. A live cpu-basic
+benchmark is pending. Pack release is 3.0.0; the existing Legacy renderer and
+Optical algorithm identifiers are retained for recipe provenance.
 
 The app adapter and ComfyUI node import the same implementation in `hfr_core`.
 `optical.py` is part of that shared package; it is not a second app renderer.
@@ -86,8 +87,11 @@ The exact numeric values, lens mode and curve are saved. A custom aperture or
 timing does not acquire a preset name. Existing imported recipes retain their
 original mode and settings. Optical can be switched back to Legacy.
 
-The app warns when the two endpoint taps differ by less than 0.12 in normalized
-estimated depth. This is a heuristic, not a measured scene distance. After a
+The app advises when the two endpoint taps differ by less than 0.12 in normalized
+estimated depth. The eight-clip audit flagged only Walkie (1/8; 0/8 at 0.06), so
+the threshold is retained. Its wording acknowledges that a gentle pull can work
+and points to More controls → Adjust a depth region. This is a heuristic, not a
+measured scene distance or a failed-render verdict. After a
 depth analysis, further adjustments reuse the cached depth. Head-follow mode
 can still require its own subject-analysis job; the job label remains explicit.
 

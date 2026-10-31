@@ -70,5 +70,5 @@ def depth_warning(depth,start_x,start_y,end_x,end_y):
     first=sample(d,start_x,start_y,0);last=sample(d,end_x,end_y,len(d)-1)
     gap=abs(last-first)
     return dict(start=first,end=last,gap=gap,close=gap<.12,
-                message=('These focus points have similar estimated depth. The pull may be subtle. '
-                         'Choose different points or adjust a depth region.' if gap<.12 else ''))
+                message=('These points have similar estimated depth; a gentle pull can still work.'
+                         if gap<.12 else ''))

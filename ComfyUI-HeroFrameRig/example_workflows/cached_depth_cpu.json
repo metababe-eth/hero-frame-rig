@@ -36,11 +36,23 @@
       "end_x": 0.7498045347928068,
       "end_y": 0.55049786628734,
       "blur_strength": 50,
-      "arrival": 0.7777777777777778,
+      "arrival": 0.4444444444444444,
       "in_between": "stay",
-      "spotlight": 60,
+      "spotlight": 0,
       "seed": 7,
-      "edge_cleanup": 0.5
+      "edge_cleanup": 0.5,
+      "lens_mode": "optical",
+      "aperture": 2.8,
+      "focal_length_mm": 50,
+      "sensor_width_mm": 36,
+      "near_m": 0.5,
+      "far_m": 10,
+      "depth_smoothing": 0.5,
+      "breathing": 0,
+      "depth_nudge_json": ""
+    },
+    "_meta": {
+      "title": "HFR Optical - Cinematic f/2.8, 70% arrival"
     }
   },
   "5": {

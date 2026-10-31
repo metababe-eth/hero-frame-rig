@@ -13,6 +13,7 @@ from . import schedule, edges
 from ._support import describe, patch_level
 
 VERSION = 'hfr-shared-round-v2-edges'
+__version__ = '3.0.0'  # Pack release; Legacy recipe/renderer IDs remain stable.
 
 
 def bounded(value, low, high, name):

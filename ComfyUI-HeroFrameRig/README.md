@@ -1,8 +1,14 @@
 # ComfyUI-HeroFrameRig
 
-Direct focus after the shot is made. MIT-licensed, model-free nodes and a shared
-numpy/torch CPU implementation. Source blur cannot be undone. Estimated depth,
-soft round Gaussian blur and spotlight grading are stylized effects.
+**Pack 3.0.0 — Optical focus.** Direct focus after the shot is made. MIT-licensed,
+model-free nodes and a shared numpy/torch CPU implementation. Optical adds a
+virtual f/2.8 lens, round-disc blur in linear light, eased focus timing and depth
+smoothing. Source blur cannot be undone; relative depth is not measured metres.
+Legacy keeps the previous Gaussian treatment and existing recipes.
+
+The package version is separate from renderer/recipe identifiers: Legacy stays
+`hfr-shared-round-v2-edges`, Optical stays `hfr-optical-v1`. Introducing the pack's
+explicit 3.0.0 release does not relabel older saved renders.
 
 Copy this entire folder to `ComfyUI/custom_nodes/ComfyUI-HeroFrameRig`, install
 `requirements.txt` into ComfyUI's Python environment, and restart ComfyUI. For a
@@ -19,6 +25,11 @@ an existing RGB batch with an existing depth batch.
   depth; face accepts an optional precomputed `head_targets_json`. Face without
   these targets fails clearly; the node does not hide a face model or silently
   change modes. `focus_curve_json` replays an exact saved schedule.
+  Optional `lens_mode='optical'` enables aperture, focal length, sensor width,
+  near/far calibration, depth smoothing and breathing (off by default).
+  `depth_nudge_json` accepts the saved single-region correction; it is not object
+  tracking. Node defaults remain Legacy for compatibility. New optional widgets
+  are appended after old ones. See [Optical settings and presets](OPTICAL.md).
 - **HFR Beat Focus**: AUDIO, images, depth and two taps. Detects spectral-flux
   transient peaks across the supplied audio, rounds them to the nearest video
   frame, and switches focus between taps at those frames. `audio_offset` selects
@@ -44,7 +55,7 @@ before submitting. Put the referenced files in ComfyUI/input.
 
 | File | Dependencies |
 | --- | --- |
-| `cached_depth_cpu.json` | `sharp.mp4`, `hfr_depth.npz`; CPU only, no models |
+| `cached_depth_cpu.json` | `sharp.mp4`, `hfr_depth.npz`; Optical Cinematic f/2.8, 70% arrival, CPU only |
 | `focus_pull_from_video.json` | Load Video → DA3 Metric → Focus Pull → Save Video; DA3 model required |
 | `beat_focus.json` | `sharp.mp4`, `hfr_depth.npz`, `song.flac`; CPU only |
 | `still_to_directed_clip.json` | FLUX 3 Klein → LTX-2.3 → DA3 → Focus Pull |
@@ -56,6 +67,9 @@ are provided as graph templates; a CPU lens replay is not evidence that these
 large models have been run on CPU. DA3 min/max outputs bright-near depth; unlike
 the app's metric-depth conversion it normalizes each frame, which can breathe.
 Prefer an app recipe's exact cached depth for a matched replay.
+The cached-depth example explicitly sets all Optical values, Spotlight 0 and
+breathing 0. It demonstrates a fresh automatic pull, not the timing of an
+arbitrary saved take; use the recipe's own workflow for exact replay.
 
 The full generation examples use the project's retained LTX-2.3 graph and
 official Comfy still templates. Model licenses remain separate from this MIT
@@ -66,13 +80,13 @@ weights. No weights or media are bundled here.
 
 The app imports `hfr_core` from this folder. Local ComfyUI runs the node; Cloud
 analysis returns depth and the app runs this exact core on its host CPU. The
-shared kernel retains HFR's focus scheduling, round blur footprint, foreground
+Legacy retains HFR's focus scheduling, round blur footprint, foreground
 spill, normalized background gather and spotlight. Its color shoulders and very
 fine seeded sensor noise are independent implementations, not copied Radiance
 code. Exact prior Radiance grain is not part of this MIT pack; compare the saved
 regression evidence when reviewing the change.
 
-The shared edge-ownership pass uses only RGB and depth: eroded near-depth support,
+The Legacy edge-ownership pass uses only RGB and depth: eroded near-depth support,
 a bounded local search across depth jumps, thin RGB structure evidence, and a
 feathered blend of the owning region's blur. It adds no model and contains no
 shot-specific region, ellipse or object name. A small smooth blur floor removes
@@ -83,3 +97,9 @@ is never overwritten. This heuristic can soften other contrast edges, and it
 cannot infer ownership when no valid near region exists nearby. Transparent
 objects, reflections, fine occlusions and inaccurate depth remain limitations. These nodes never regenerate motion or recover detail
 already blurred in the source.
+
+Optical uses a separate mode inside the same shared core, with layered,
+premultiplied disc blur and RGB-guided depth cleanup. Its recipe includes exact
+lens values and the original cached depth. Optional manual depth correction is
+applied once after cleanup; moving objects at similar estimated depth can enter
+its fixed screen region. See [OPTICAL.md](OPTICAL.md) for the limits and tests.
