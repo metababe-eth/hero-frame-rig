@@ -20,14 +20,24 @@ class FocusPull:
             'spotlight': ('FLOAT', {'default':0,'min':0,'max':100,'step':1}),
             'seed': ('INT', {'default':7,'min':0,'max':4294967295}),
         }, 'optional': {
+            # Append new widgets after the old ones: saved UI workflows keep
+            # positional widget values even when API recipes use named inputs.
             'edge_cleanup': ('FLOAT', {'default':.5,'min':0,'max':1,'step':.05}),
             'focus_curve_json': ('STRING', {'default':'','multiline':True}),
             'head_targets_json': ('STRING', {'default':'','multiline':True}),
+            'lens_mode': (['legacy','optical'],),
+            'aperture': ('FLOAT', {'default':2.8,'min':.7,'max':32,'step':.1}),
+            'focal_length_mm': ('FLOAT', {'default':50.,'min':8.,'max':200.}),
+            'sensor_width_mm': ('FLOAT', {'default':36.,'min':8.,'max':100.}),
+            'near_m': ('FLOAT', {'default':.5,'min':.25,'max':100.}),
+            'far_m': ('FLOAT', {'default':10.,'min':.5,'max':10000.}),
+            'depth_smoothing': ('FLOAT', {'default':.5,'min':0.,'max':1.,'step':.05}),
+            'breathing': ('FLOAT', {'default':0.,'min':0.,'max':.02,'step':.001}),
         }}
     RETURN_TYPES=('IMAGE',)
     FUNCTION='execute'
     CATEGORY='Hero Frame Rig'
-    DESCRIPTION='Direct existing pixels using bright-near depth. Face requires head_targets_json; it does not run face recognition.'
+    DESCRIPTION='Direct existing pixels using bright-near depth. Legacy replays old recipes; Optical uses a virtual f/2.8 lens by default. Relative depth is not measured metres. Face requires head_targets_json.'
 
     def execute(self, images, depth, focus_curve_json='', head_targets_json='', **settings):
         from comfy.utils import ProgressBar

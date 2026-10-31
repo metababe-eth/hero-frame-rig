@@ -13,6 +13,13 @@ def workflow(plan, sharp='sharp.mp4', depth='hfr_depth.npz'):
     params=dict(start_x=a[0]/(w-1),start_y=a[1]/(h-1),end_x=b[0]/(w-1),end_y=b[1]/(h-1),
         blur_strength=plan['blur'], arrival=(plan['pull_lands_at_percent']-50)/45,
         in_between=mode,spotlight=plan['guide'],seed=7,edge_cleanup=plan.get('edge_cleanup',0),focus_curve_json=json.dumps(plan['render_curve']))
+    lens_mode=plan.get('lens_mode','legacy')
+    if lens_mode not in ('legacy','optical'): raise ValueError('Unknown recipe lens mode.')
+    if lens_mode=='optical':
+        from hfr_core.optical import DEFAULTS, settings
+        # Complete numeric settings are written into the graph for portable
+        # replay. Missing mode on every older recipe still follows Legacy.
+        params.update(settings(**{key:plan[key] for key in DEFAULTS if key in plan}))
     return {
         '1': {'class_type':'LoadVideo','inputs':{'file':sharp}},
         '2': {'class_type':'GetVideoComponents','inputs':{'video':['1',0]}},

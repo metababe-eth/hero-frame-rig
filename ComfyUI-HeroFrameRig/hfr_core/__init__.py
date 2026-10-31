@@ -46,7 +46,12 @@ def sample(depth, x, y, frame=0):
     return patch_level(d[frame], x, y)
 
 
-def make_plan(depth, start_x, start_y, end_x, end_y, blur_strength=50, arrival=7/9, in_between='stay', head_targets=None):
+def make_plan(depth, start_x, start_y, end_x, end_y, blur_strength=50, arrival=7/9, in_between='stay', head_targets=None,
+              lens_mode='legacy'):
+    if lens_mode == 'optical':
+        from .optical import make_plan as optical_plan
+        return optical_plan(depth, start_x, start_y, end_x, end_y, blur_strength, arrival, in_between, head_targets)
+    if lens_mode != 'legacy': raise ValueError('Lens mode must be legacy or optical.')
     d = depth_array(depth); n, h, w = d.shape
     if n < 9: raise ValueError('Scheduled focus needs at least nine frames.')
     if in_between not in ('stay', 'closest', 'face'): raise ValueError('Unknown in-between mode.')
@@ -144,7 +149,7 @@ def _finish(x, seed, frame):
 
 
 @torch.inference_mode()
-def render(images, depth, start_x=.25, start_y=.45, end_x=.75, end_y=.55,
+def _render_legacy(images, depth, start_x=.25, start_y=.45, end_x=.75, end_y=.55,
            blur_strength=50, arrival=7/9, in_between='stay', spotlight=0, seed=7,
            focus_curve=None, head_targets=None, progress=None, edge_cleanup=.5):
     """Return NHWC float IMAGE. Identical function used by app and Comfy node.
@@ -212,6 +217,30 @@ def render(images, depth, start_x=.25, start_y=.45, end_x=.75, end_y=.55,
         out[i] = _finish(result,seed,i)[0].permute(1,2,0)
         if progress: progress(i+1,n)
     return out
+
+
+def render(images, depth, start_x=.25, start_y=.45, end_x=.75, end_y=.55,
+           blur_strength=50, arrival=7/9, in_between='stay', spotlight=0, seed=7,
+           focus_curve=None, head_targets=None, progress=None, edge_cleanup=.5,
+           lens_mode='legacy', aperture=2.8, focal_length_mm=50., sensor_width_mm=36.,
+           near_m=.5, far_m=10., depth_smoothing=.5, breathing=0.):
+    """Shared app/node renderer. Missing mode always replays the unchanged Legacy.
+
+    Optical is opt-in until artist acceptance. Its aperture describes a virtual
+    thin lens over explicitly assumed relative-depth distances, not measured
+    camera metadata. Breathing is a maximum fractional crop (0--0.02), off.
+    """
+    common = dict(start_x=start_x, start_y=start_y, end_x=end_x, end_y=end_y,
+                  blur_strength=blur_strength, arrival=arrival, in_between=in_between,
+                  spotlight=spotlight, seed=seed, focus_curve=focus_curve,
+                  head_targets=head_targets, progress=progress, edge_cleanup=edge_cleanup)
+    if lens_mode == 'legacy':
+        return _render_legacy(images, depth, **common)
+    if lens_mode != 'optical': raise ValueError('Lens mode must be legacy or optical.')
+    from .optical import render as optical_render
+    return optical_render(images, depth, aperture=aperture, focal_length_mm=focal_length_mm,
+                          sensor_width_mm=sensor_width_mm, near_m=near_m, far_m=far_m,
+                          depth_smoothing=depth_smoothing, breathing=breathing, **common)
 
 
 def detect_beats(audio, sample_rate, fps=25):
