@@ -33,18 +33,20 @@ class FocusPull:
             'far_m': ('FLOAT', {'default':10.,'min':.5,'max':10000.}),
             'depth_smoothing': ('FLOAT', {'default':.5,'min':0.,'max':1.,'step':.05}),
             'breathing': ('FLOAT', {'default':0.,'min':0.,'max':.02,'step':.001}),
+            'depth_nudge_json': ('STRING', {'default':'','multiline':True}),
         }}
     RETURN_TYPES=('IMAGE',)
     FUNCTION='execute'
     CATEGORY='Hero Frame Rig'
     DESCRIPTION='Direct existing pixels using bright-near depth. Legacy replays old recipes; Optical uses a virtual f/2.8 lens by default. Relative depth is not measured metres. Face requires head_targets_json.'
 
-    def execute(self, images, depth, focus_curve_json='', head_targets_json='', **settings):
+    def execute(self, images, depth, focus_curve_json='', head_targets_json='', depth_nudge_json='', **settings):
         from comfy.utils import ProgressBar
         p=ProgressBar(len(images))
         out=core.render(images,depth,
             focus_curve=json.loads(focus_curve_json) if focus_curve_json else None,
             head_targets=json.loads(head_targets_json) if head_targets_json else None,
+            depth_nudge=json.loads(depth_nudge_json) if depth_nudge_json else None,
             progress=lambda i,n:p.update_absolute(i,n), **settings)
         return (out,)
 

@@ -44,6 +44,7 @@ import ui_state
 import clip_focus
 import clip_upload
 import clip_flow
+import clip_lens
 import detail_focus
 import camera_control
 import agent_api
@@ -894,7 +895,7 @@ def upload_for_direct(path):
     if not path:return tuple(gr.skip() for _ in clip_outs)
     try:value=clip_upload.prepare(path,0,24,97)
     except (ValueError,OSError,KeyError) as exc:raise gr.Error(str(exc)) from exc
-    value['settings']['guide']=60;clip_focus.save(value)
+    clip_focus.save(value)
     return simple_outputs(value)
 
 def open_simple_recipe(path):
@@ -922,7 +923,8 @@ def direct_simple(value,blur,spotlight,middle,landing,edge_cleanup=.5):
     def stage(value,desc=None):messages.put(('stage',desc or 'Preparing focus…'))
     def run():
         try:
-            for row in direct_clip(value,clip_flow.aperture(blur),spotlight,middle,landing,stage,edge_cleanup=edge_cleanup):messages.put(('row',row))
+            saved=clip_focus.current(value)['settings'].get('f_stop')
+            for row in direct_clip(value,clip_flow.aperture(blur,saved),spotlight,middle,landing,stage,edge_cleanup=edge_cleanup):messages.put(('row',row))
         except Exception as exc:messages.put(('error',exc))
         finally:messages.put(('end',None))
     request_context=contextvars.copy_context()
@@ -944,12 +946,48 @@ def direct_simple(value,blur,spotlight,middle,landing,edge_cleanup=.5):
 
 def animate_simple(*args):
     row=list(animate_for_ui(*args));value=row[0]
-    value['settings']['guide']=60;clip_focus.save(value)
+    clip_focus.save(value)
     return (*simple_outputs(value,'Your clip is ready to direct.'),row[-1])
 
 def simple_state(value):
     ready=bool(value and value.get('focused'))
-    return gr.update(visible=ready),gr.update(value=None,visible=False),clip_flow.cost(value)
+    return gr.update(visible=ready),gr.update(value=None,visible=False),clip_flow.cost(value),*clip_lens.panel(value)
+
+
+def select_focus_preset(value,name):
+    if not value or not name:return gr.skip(),gr.skip(),gr.skip(),gr.skip()
+    value=clip_lens.choose_preset(value,name)
+    return value,clip_flow.blur(value['settings']['f_stop']),value['settings']['landing'],'Preset set. Press Direct it.'
+
+
+def select_lens_mode(value,mode):
+    if not value:return gr.skip(),gr.skip(),gr.skip(),gr.skip()
+    value=clip_lens.choose_mode(value,mode)
+    return value,clip_flow.blur(value['settings']['f_stop']),value['settings']['landing'],'Lens selected. Press Direct it.'
+
+
+def select_depth_region(value,evt:gr.SelectData):
+    try:value=clip_lens.select(value,evt.index)
+    except ValueError as exc:raise gr.Error(str(exc)) from exc
+    return value,'Depth region selected. Adjust the nudge, then press Direct it.'
+
+
+def adjust_depth_region(value,frame,amount,radius,band):
+    if not value:return gr.skip()
+    try:return clip_lens.controls(value,frame,amount,radius,band)
+    except ValueError as exc:raise gr.Error(str(exc)) from exc
+
+
+def clear_depth_region(value):
+    if not value:return gr.skip(),gr.skip()
+    return clip_lens.reset(value),'Depth correction cleared. Press Direct it to render again.'
+
+
+def preview_depth_frame(value,frame):
+    if not value:return gr.skip()
+    if frame not in ('Start','End'):raise gr.Error('Choose Start or End.')
+    value=clip_focus.current(value);value['settings']['nudge_frame']=frame
+    clip_focus.save(value);return value
 
 
 # ---------------- UI ----------------
@@ -1024,18 +1062,30 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
                                 clip_end=gr.Image(label="End: tap what's sharp",type='pil',interactive=False,format='png',buttons=[],min_width=0,elem_id='clip-end')
                             with gr.Column(min_width=0,elem_id='clip-controls'):
                                 gr.Markdown('**3 · Direct it**')
+                                clip_preset=gr.Radio(list(clip_focus.directing.PRESETS),value='Cinematic',label='Focus preset',info='Subtle f/5.6 · Cinematic f/2.8 · Dramatic f/1.4. Each sets aperture and timing.',elem_id='clip-preset')
+                                clip_depth_warning=gr.Markdown(elem_id='clip-depth-warning')
                                 clip_direct_button=gr.Button('Direct it',interactive=False,variant='primary',elem_id='clip-direct-button')
                                 clip_cost=gr.Markdown(elem_id='clip-cost')
                                 clip_status=gr.HTML(elem_id='clip-status')
                         with gr.Accordion('More controls',open=False,elem_id='clip-more-controls'):
-                            clip_aperture=gr.Slider(0,100,value=100,step=1,label='Blur',elem_id='clip-aperture')
+                            clip_lens_mode=gr.Radio([('Optical','optical'),('Legacy','legacy')],value='optical',label='Lens mode',elem_id='clip-lens-mode')
+                            clip_aperture=gr.Slider(0,100,value=clip_flow.blur(2.8),step=.1,label='Blur',elem_id='clip-aperture')
                             gr.HTML('<div class="slider-ends"><span>Subtle</span><span>Strong</span></div>')
-                            clip_middle=gr.Radio(clip_flow.MIDDLE,value=clip_focus.HEAD,label='In between',elem_id='clip-middle')
+                            clip_middle=gr.Radio(clip_flow.MIDDLE,value=clip_focus.HOLD,label='In between',elem_id='clip-middle')
                             gr.Markdown('Face follow aims at the top of the subject. It can miss small or hidden faces.',elem_id='clip-follow-help')
-                            clip_landing=gr.Slider(50,95,value=85,step=1,label='When focus arrives',elem_id='clip-landing')
+                            clip_landing=gr.Slider(50,95,value=70,step=1,label='When focus arrives',elem_id='clip-landing')
                             gr.HTML('<div class="slider-ends"><span>Early</span><span>Late</span></div>')
-                            clip_guide=gr.Slider(0,100,value=60,step=1,label='Spotlight',info="Darkens what's out of focus",elem_id='clip-guide')
+                            clip_guide=gr.Slider(0,100,value=0,step=1,label='Spotlight',info="Darkens what's out of focus",elem_id='clip-guide')
                             clip_edge_cleanup=gr.Slider(0,1,value=.5,step=.05,label='Edge cleanup',info='Feathers thin edges toward nearby solid depth. 0 keeps the previous render.',elem_id='clip-edge-cleanup')
+                            with gr.Accordion('Adjust a depth region',open=False,elem_id='clip-depth-adjust'):
+                                gr.Markdown('Tap the area whose depth needs correction. The highlight shows what will change. This region stays at its screen position; it does not track an object.')
+                                clip_nudge_frame=gr.Radio(['Start','End'],value='Start',label='Preview frame',elem_id='clip-nudge-frame')
+                                clip_nudge_image=gr.Image(label='Tap a depth region',type='pil',interactive=False,format='png',buttons=[],elem_id='clip-nudge-image')
+                                clip_nudge_info=gr.Markdown(elem_id='clip-nudge-info')
+                                clip_nudge_amount=gr.Slider(-30,30,value=0,step=1,label='Farther ← depth nudge → nearer',info='0 keeps the estimated depth.',elem_id='clip-nudge-amount')
+                                clip_nudge_radius=gr.Slider(5,75,value=35,step=1,label='Area size (%)',elem_id='clip-nudge-radius')
+                                clip_nudge_band=gr.Slider(1,12,value=3.5,step=.5,label='Depth range (%)',info='Widen only if the highlighted area misses part of your target.',elem_id='clip-nudge-band')
+                                clip_nudge_reset=gr.Button('Clear depth correction',elem_id='clip-nudge-reset')
                             with gr.Column(min_width=0,elem_id='clip-timeline'):
                                 gr.Markdown('**Focus over time**')
                                 clip_plot=gr.HTML(clip_focus.plot(None),elem_id='clip-plot')
@@ -1244,7 +1294,17 @@ with gr.Blocks(title="Hero Frame Rig") as demo:
         [clip_state,clip_direct_button,clip_compare,clip_toggle,clip_plot,animation_video,clip_status,clip_recipe_download,clip_meta],**{**queue,'show_progress':'hidden'})
     clip_save_button.click(save_clip_recipe,clip_state,clip_recipe_download,**queue)
     clip_middle.input(simple_middle,[clip_state,clip_middle],[clip_state,clip_direct_button],**queue)
-    clip_state.change(simple_state,clip_state,[clip_result,clip_share_download,clip_cost],queue=False,api_visibility="private")
+    clip_state.change(simple_state,clip_state,[clip_result,clip_share_download,clip_cost,
+        clip_lens_mode,clip_preset,clip_depth_warning,clip_nudge_image,clip_nudge_frame,
+        clip_nudge_amount,clip_nudge_radius,clip_nudge_band,clip_nudge_info],queue=False,api_visibility="private")
+    clip_preset.input(select_focus_preset,[clip_state,clip_preset],[clip_state,clip_aperture,clip_landing,clip_status],**queue)
+    clip_lens_mode.input(select_lens_mode,[clip_state,clip_lens_mode],[clip_state,clip_aperture,clip_landing,clip_status],**queue)
+    clip_nudge_image.select(select_depth_region,clip_state,[clip_state,clip_status],**queue)
+    nudge_inputs=[clip_state,clip_nudge_frame,clip_nudge_amount,clip_nudge_radius,clip_nudge_band]
+    clip_nudge_frame.input(preview_depth_frame,[clip_state,clip_nudge_frame],clip_state,**queue)
+    for control in (clip_nudge_amount,clip_nudge_radius,clip_nudge_band):
+        control.input(adjust_depth_region,nudge_inputs,clip_state,trigger_mode='always_last',**queue)
+    clip_nudge_reset.click(clear_depth_region,clip_state,[clip_state,clip_status],**queue)
     clip_share_button.click(share_clip,clip_state,clip_share_download,**queue).then(
         None,clip_share_download,None,js="(files) => { window.heroRig?.saveShare(files); return []; }",queue=False,api_visibility="private")
 

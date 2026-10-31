@@ -11,11 +11,17 @@ import numpy as np
 from PIL import Image,ImageDraw
 import backend,focus_core,focus_replay
 import optics,focus_schedule,rack_focus,rig_workflow,round_video,video_masks,head_focus,video_occlusion
+from hfr_core import optical,directing
 
 FOLLOW='Follow what is nearest'
 HEAD="Follow the subject's head"
 HOLD='Hold the start'
 SCHEMA='hero-clip-focus-v1'
+
+
+def default_settings():
+    return dict(middle=HOLD,landing=70.,f_stop=2.8,guide=0,edge_cleanup=.5,
+                focus_preset='Cinematic',depth_nudge=None,**optical.settings())
 
 def dump(path,value):
     Path(path).write_text(json.dumps(value,indent=2),encoding='utf-8')
@@ -25,8 +31,8 @@ def probe(path):
     videos=[s for s in data['streams'] if s['codec_type']=='video']
     if len(videos)!=1:raise ValueError('Choose a clip with one video stream.')
     s=videos[0];n=int(s['nb_read_frames']);fps=float(Fraction(s['avg_frame_rate']))
-    if not 9<=n<=193 or fps!=25 or s['width']*s['height']>704*1280:
-        raise ValueError('Clip focus supports 9–193 frames at 25 fps, up to 704 × 1280 pixels.')
+    if not 9<=n<=193 or fps not in (24,25) or s['width']*s['height']>704*1280:
+        raise ValueError('Clip focus supports 9–193 frames at 24 or 25 fps, up to 704 × 1280 pixels.')
     return {'frames':n,'fps':fps,'width':s['width'],'height':s['height']}
 
 def save(state):dump(Path(state['dir'])/'clip_state.json',state)
@@ -49,7 +55,7 @@ def initialize(clip,lens=85,strength=1.0):
            'first':str(directory/'first.png'),'last':str(directory/'last.png'),**meta,
            'lens_mm':float(lens),'strength':float(strength),'points':[None,None],
            'depth':None,'focused':None,'plan':None,'jobs':[],
-           'settings':{'middle':HEAD,'landing':85,'f_stop':1.4,'guide':0,'edge_cleanup':.5}}
+           'settings':default_settings()}
     save(state);return state
 
 def marked(state,which):
@@ -62,6 +68,10 @@ def point_distance(state,which):
     if point is None:return 'Choose a point'
     cache=state.get('depth');plan=state.get('plan') or {}
     if cache:
+        if cache.get('format')=='relative_npz':
+            d,_=cached_disparity(state)
+            value=focus_core.sample(d,point[0]/(state['width']-1),point[1]/(state['height']-1),0 if which==0 else len(d)-1)
+            return f'{value:.3f} relative depth (est.)'
         # Decode only the two endpoint images, once per clip, never the full array.
         endpoint_file=Path(state['dir'])/'endpoint_depth.npy'
         if not endpoint_file.exists():
@@ -148,7 +158,7 @@ def plot(plan):
         name={'head':'follow head','nearest':'follow nearest','pull':'pull','fixed':'hold start' if i<len(plan['phases'])-1 else 'hold end'}.get(p['mode'],str(p['mode']))
         names.append(f'<span>{html.escape(name)}</span>')
         lines.append(f'<line x1="{x}" y1="22" x2="{x}" y2="130" stroke="#5D565F"/>')
-    duration=(n-1)/25
+    duration=(n-1)/plan.get('fps',25)
     return f'<div class="clip-phase-labels">{"".join(names)}</div><div class="clip-scale-label">↑ Nearer · vertical scale fitted to this clip</div><svg viewBox="0 0 {w} {h}" role="img" aria-label="Estimated-depth focus schedule, nearer upward" data-duration="{duration}" data-depth-min="{low}" data-depth-max="{high}" style="width:100%;fill:#B7B0A4"><line x1="40" y1="130" x2="860" y2="130" stroke="#5B555D"/>{"".join(lines)}<line class="clip-playhead" x1="40" x2="40" y1="22" y2="130" stroke="#ECE8E1" stroke-width="2"/><circle class="clip-playhead-dot" cx="40" cy="130" r="4" fill="#ECE8E1"/><text x="40" y="160">0 s</text><text x="685" y="160">{duration:.2f} s · focus depth</text></svg><div class="clip-playback-time" aria-live="off">0.00 s</div>'
 
 def load_study(root):
@@ -169,7 +179,10 @@ def export_recipe(state):
     if state.get('head_matte'):paths['head_matte']=(Path(state['head_matte']),'subject.avif')
     if state.get('depth'):
         meta['depth']={k:v for k,v in state['depth'].items() if k not in ['raw','sky']}
-        paths['depth_raw']=(Path(state['depth']['raw']),'depth.avif');paths['depth_sky']=(Path(state['depth']['sky']),'sky.avif')
+        if state['depth'].get('format')=='relative_npz':
+            paths['depth_relative']=(Path(state['depth']['raw']),'source_depth.npz')
+        else:
+            paths['depth_raw']=(Path(state['depth']['raw']),'depth.avif');paths['depth_sky']=(Path(state['depth']['sky']),'sky.avif')
     replay_depth=directory/'focus/hfr_depth.npz'
     if state.get('focused') and state.get('plan') and replay_depth.exists():
         paths['render_depth']=(replay_depth,'hfr_depth.npz')
@@ -180,7 +193,7 @@ def export_recipe(state):
         if 'render_depth' in paths:
             z.writestr('workflow.json',json.dumps(focus_replay.workflow(state['plan']),indent=2))
             z.writestr('REPLAY.txt','Install ComfyUI-HeroFrameRig in custom_nodes. Copy sharp.mp4 and hfr_depth.npz into ComfyUI/input. Submit workflow.json (API format) using the SDK or POST /prompt. Uses the exact saved float depth and focus curve; no model download or generation. Seed 7.\n')
-        z.writestr('README.txt','Hero Frame Rig clip recipe. Estimated depth, stylized focus, no video subject hold. Reopen this ZIP to reuse its depth. Graphs and lossless masks retain the latest focus render. No graph in an imported ZIP is executed.\n')
+        z.writestr('README.txt','Hero Frame Rig clip recipe. Estimated depth, stylized focus, no video subject hold. Reopen this ZIP to reuse its original depth. Optical recipes store the exact lens, preset values and optional depth-region correction separately; the correction is applied once after depth preparation. A region stays at its screen position, not on a tracked object. Graphs and lossless masks retain the latest focus render. No graph in an imported ZIP is executed.\n')
         for path,name in paths.values():z.write(path,name)
         for folder in ['depth','focus','head']:
             base=directory/folder
@@ -214,14 +227,20 @@ def import_recipe(path):
     if 'head_matte' in files:
         p=Path(state['dir'])/'subject.avif';shutil.copy2(directory/files['head_matte'],p);state['head_matte']=str(p)
     if meta.get('depth'):
-        cached=copy.deepcopy(meta['depth']);scale=float(cached['scale'])
-        if not math.isfinite(scale) or not 0<scale<=1024:raise ValueError('Invalid depth packing scale.')
-        for role,name in [('raw','depth_raw'),('sky','depth_sky')]:
-            p=Path(state['dir'])/('cached_'+role+'.avif');shutil.copy2(directory/files[name],p);cached[role]=str(p)
+        cached=copy.deepcopy(meta['depth'])
+        relative=cached.get('format')=='relative_npz'
+        if not relative:
+            scale=float(cached['scale'])
+            if not math.isfinite(scale) or not 0<scale<=1024:raise ValueError('Invalid depth packing scale.')
+        for role,name in ([('raw','depth_relative')] if relative else [('raw','depth_raw'),('sky','depth_sky')]):
+            p=Path(state['dir'])/('cached_'+role+('.npz' if relative else '.avif'));shutil.copy2(directory/files[name],p);cached[role]=str(p)
         cached['clip_id']=state['id'];state['depth']=cached
     if 'render_depth' in files:
         target=Path(state['dir'])/'focus/hfr_depth.npz';target.parent.mkdir(exist_ok=True)
         shutil.copy2(directory/files['render_depth'],target)
+        if not state.get('depth'):
+            state['depth']={'format':'relative_npz','raw':str(target),'clip_id':state['id'],
+                            'z_near':(meta.get('plan') or {}).get('z_near',1.)}
     # Keep portable render evidence when a saved recipe is reopened and exported.
     # Imported graphs are retained as data and are never executed.
     for folder in ('depth','focus','head'):
@@ -255,22 +274,55 @@ def estimate_depth(client,state,include_head=False):
     state['depth']={'raw':str(directory/'depth.avif'),'sky':str(directory/'sky.avif'),'scale':4,'job':job,'clip_id':state['id']}
     save(state)
 
-def render_focus(client,state,f_stop,guide,middle,landing,progress=lambda message:None,edge_cleanup=None):
-    state=current(state);requested=phases(state,middle,landing)
-    edge_cleanup=focus_core.bounded(state['settings'].get('edge_cleanup',0) if edge_cleanup is None else edge_cleanup,0,1,'edge cleanup')
-    f_stop=float(f_stop);guide=float(guide)
-    if not math.isfinite(f_stop) or not 1.4<=f_stop<=5.6 or not math.isfinite(guide) or not 0<=guide<=100:raise ValueError('Invalid aperture or guide value.')
+def cached_disparity(state):
+    """Immutable original depth for planning, previews and exact recipe replay."""
     if not state.get('depth'):raise ValueError('Estimate this clip depth first.')
     cache=state['depth']
     if cache['clip_id']!=state['id']:raise ValueError('Depth belongs to a different clip.')
+    folder=Path(state['dir']);target=folder/'relative_source.npy';meta=folder/'relative_source.json'
+    if target.exists() and meta.exists():
+        return np.load(target,mmap_mode='r',allow_pickle=False),json.loads(meta.read_text())['z_near']
+    n,h,w=state['frames'],state['height'],state['width']
+    if cache.get('format')=='relative_npz':
+        with zipfile.ZipFile(cache['raw']) as archive:
+            if sum(i.file_size for i in archive.infolist())>n*h*w*4+4096:
+                raise ValueError('Saved depth exceeds this clip size.')
+        with np.load(cache['raw'],allow_pickle=False) as archive:d=archive['depth'].astype(np.float32)
+        d=focus_core.depth_array(d)
+        near=focus_core.bounded(cache.get('z_near',1),.0001,10000,'depth calibration')
+    else:
+        z,sky=rack_focus.read_clip_depth(cache['raw'],cache['sky'],depth_scale=cache['scale'],expected_frames=n)
+        if z.shape!=(n,h,w):raise ValueError('Depth dimensions do not match the clip.')
+        if np.max(z)>=cache['scale']:raise ValueError('Depth clipping detected; inspect the recipe before rendering.')
+        z*=optics.metric_scale(state['lens_mm'],w,h)
+        near=optics.z_near_for([np.where(sky[i]<.5,z[i],np.inf) for i in range(n)])
+        d=np.stack([optics.disparity(z[i],near,sky[i]) for i in range(n)])
+    if d.shape!=(n,h,w):raise ValueError('Depth dimensions do not match the clip.')
+    np.save(target,d);dump(meta,{'z_near':near})
+    return np.load(target,mmap_mode='r',allow_pickle=False),near
+
+
+def render_focus(client,state,f_stop,guide,middle,landing,progress=lambda message:None,edge_cleanup=None):
+    state=current(state);phases(state,middle,landing)
+    edge_cleanup=focus_core.bounded(state['settings'].get('edge_cleanup',0) if edge_cleanup is None else edge_cleanup,0,1,'edge cleanup')
+    f_stop=float(f_stop);guide=float(guide)
+    if not math.isfinite(f_stop) or not 1.4<=f_stop<=5.6 or not math.isfinite(guide) or not 0<=guide<=100:raise ValueError('Invalid aperture or guide value.')
     progress('Reading cached estimated depth…')
-    n=state['frames'];z,sky=rack_focus.read_clip_depth(cache['raw'],cache['sky'],depth_scale=cache['scale'],expected_frames=n)
-    if z.shape!=(n,state['height'],state['width']):raise ValueError('Depth dimensions do not match the clip.')
-    if np.max(z)>=cache['scale']:raise ValueError('Depth clipping detected; inspect the recipe before rendering.')
-    z*=optics.metric_scale(state['lens_mm'],state['width'],state['height'])
-    near=optics.z_near_for([np.where(sky[i]<.5,z[i],np.inf) for i in range(n)])
-    d=np.stack([optics.disparity(z[i],near,sky[i]) for i in range(n)]);del z,sky
-    blur=min(optics.blur_scale(state['lens_mm'],f_stop,state['width'],near,state['strength']),optics.MAX_BLUR)
+    d,near=cached_disparity(state);n=state['frames'];cache=state['depth'];settings=state['settings']
+    mode_name=settings.get('lens_mode','legacy');lens={};nudge=None
+    if mode_name=='optical':
+        lens=optical.settings(**{key:settings[key] for key in optical.DEFAULTS if key in settings})
+        lens['aperture']=f_stop
+        rgb=focus_replay.read_video(state['sharp'],state['width'],state['height']).copy()
+        planned=optical.prepare_depth(d,rgb,lens['depth_smoothing'],edge_cleanup)
+        nudge=directing.resolve_nudge(planned,settings.get('depth_nudge'))
+        if nudge is not None:planned=directing.nudge_depth(planned,nudge)
+        del rgb
+        blur=50
+    elif mode_name=='legacy':
+        planned=d
+        blur=min(optics.blur_scale(state['lens_mm'],f_stop,state['width'],near,state['strength']),optics.MAX_BLUR)
+    else:raise ValueError('Unknown lens mode.')
     head=None
     if middle==HEAD:
         progress('Finding the subject…')
@@ -278,14 +330,17 @@ def render_focus(client,state,f_stop,guide,middle,landing,progress=lambda messag
             progress('Finding the subject for head focus — one backend job…')
             folder,_=run_job(client,state,'head',head_focus.graph(),[('1','file',state['sharp'])],{'25':'subject.avif'})
             state['head_matte']=str(folder/'subject.avif');save(state)
-        head=head_focus.targets(state['head_matte'],d)
+        head=head_focus.targets(state['head_matte'],planned)
     a,b=state['points'];w,h=state['width'],state['height']
     mode={HOLD:'stay',FOLLOW:'closest',HEAD:'face'}[middle]
-    plan=focus_core.make_plan(d,a[0]/(w-1),a[1]/(h-1),b[0]/(w-1),b[1]/(h-1),blur,(float(landing)-50)/45,mode,head['targets'] if head else None)
+    plan=focus_core.make_plan(planned,a[0]/(w-1),a[1]/(h-1),b[0]/(w-1),b[1]/(h-1),blur,(float(landing)-50)/45,mode,head['targets'] if head else None,lens_mode=mode_name)
     if head:plan['head_tracking']=head
-    plan.update(frames=n,fps=25,width=state['width'],height=state['height'],lens_mm=state['lens_mm'],f_stop=f_stop,
+    plan.update(frames=n,fps=state['fps'],width=state['width'],height=state['height'],lens_mm=state['lens_mm'],f_stop=f_stop,
                 guide=guide,subject_hold=False,look='digital',strength=state['strength'],blur=blur,z_near=near,
-                depth_packing_scale=cache['scale'],points=state['points'],middle=middle,pull_lands_at_percent=float(landing),lens_version=focus_core.VERSION,seed=7,edge_cleanup=edge_cleanup)
+                depth_packing_scale=cache.get('scale'),points=state['points'],middle=middle,pull_lands_at_percent=float(landing),lens_version=plan['version'],seed=7,edge_cleanup=edge_cleanup)
+    if mode_name=='optical':
+        plan.update(lens,depth_nudge=nudge,focus_preset=directing.preset_name(f_stop,landing))
+    plan['depth_warning']=directing.depth_warning(planned,a[0]/(w-1),a[1]/(h-1),b[0]/(w-1),b[1]/(h-1))
     directory=Path(state['dir'])/'focus';directory.mkdir(exist_ok=True);dump(directory/'plan.json',plan)
     depth_file=directory/'hfr_depth.npz'
     np.savez_compressed(depth_file,depth=d)
@@ -302,5 +357,7 @@ def render_focus(client,state,f_stop,guide,middle,landing,progress=lambda messag
         focus_replay.render_python(state['sharp'],d,plan,result)
     del d
     if probe(result)!={k:state[k] for k in ['frames','fps','width','height']}:raise ValueError('Rendered clip dimensions differ.')
-    state.update(focused=str(result),plan=plan,settings={'middle':middle,'landing':float(landing),'f_stop':f_stop,'guide':guide,'edge_cleanup':edge_cleanup})
+    settings.update(middle=middle,landing=float(landing),f_stop=f_stop,guide=guide,edge_cleanup=edge_cleanup)
+    if mode_name=='optical':settings.update(lens,depth_nudge=nudge,focus_preset=directing.preset_name(f_stop,landing))
+    state.update(focused=str(result),plan=plan,settings=settings)
     save(state);return state

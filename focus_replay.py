@@ -15,11 +15,16 @@ def workflow(plan, sharp='sharp.mp4', depth='hfr_depth.npz'):
         in_between=mode,spotlight=plan['guide'],seed=7,edge_cleanup=plan.get('edge_cleanup',0),focus_curve_json=json.dumps(plan['render_curve']))
     lens_mode=plan.get('lens_mode','legacy')
     if lens_mode not in ('legacy','optical'): raise ValueError('Unknown recipe lens mode.')
+    if lens_mode=='legacy' and plan.get('depth_nudge') is not None:
+        raise ValueError('Depth correction needs Optical mode.')
     if lens_mode=='optical':
         from hfr_core.optical import DEFAULTS, settings
         # Complete numeric settings are written into the graph for portable
         # replay. Missing mode on every older recipe still follows Legacy.
         params.update(settings(**{key:plan[key] for key in DEFAULTS if key in plan}))
+        if plan.get('depth_nudge') is not None:
+            from hfr_core.directing import nudge_settings
+            params['depth_nudge_json']=json.dumps(nudge_settings(plan['depth_nudge']))
     return {
         '1': {'class_type':'LoadVideo','inputs':{'file':sharp}},
         '2': {'class_type':'GetVideoComponents','inputs':{'video':['1',0]}},
@@ -48,12 +53,14 @@ def encode(images,path,fps=25):
         if code: raise RuntimeError(error.decode(errors='replace')[-1000:])
     finally:
         if p.poll() is None:p.kill();p.wait()
+        p.stderr.close()
 
 
 def render_python(sharp,depth,plan,path,progress=None):
     frames=read_video(sharp,plan['width'],plan['height'])
     params=workflow(plan)['4']['inputs'].copy()
     for key in ['images','depth','focus_curve_json']: params.pop(key)
+    if 'depth_nudge_json' in params: params['depth_nudge']=json.loads(params.pop('depth_nudge_json'))
     # UInt8 source avoids retaining an extra full float copy of the clip.
     frames=torch.from_numpy(frames.copy())
     result=focus_core.render(frames,depth,focus_curve=plan['render_curve'],progress=progress,**params)

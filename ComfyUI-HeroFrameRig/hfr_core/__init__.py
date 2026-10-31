@@ -223,7 +223,7 @@ def render(images, depth, start_x=.25, start_y=.45, end_x=.75, end_y=.55,
            blur_strength=50, arrival=7/9, in_between='stay', spotlight=0, seed=7,
            focus_curve=None, head_targets=None, progress=None, edge_cleanup=.5,
            lens_mode='legacy', aperture=2.8, focal_length_mm=50., sensor_width_mm=36.,
-           near_m=.5, far_m=10., depth_smoothing=.5, breathing=0.):
+           near_m=.5, far_m=10., depth_smoothing=.5, breathing=0., depth_nudge=None):
     """Shared app/node renderer. Missing mode always replays the unchanged Legacy.
 
     Optical is opt-in until artist acceptance. Its aperture describes a virtual
@@ -235,12 +235,14 @@ def render(images, depth, start_x=.25, start_y=.45, end_x=.75, end_y=.55,
                   spotlight=spotlight, seed=seed, focus_curve=focus_curve,
                   head_targets=head_targets, progress=progress, edge_cleanup=edge_cleanup)
     if lens_mode == 'legacy':
+        if depth_nudge is not None:
+            raise ValueError('Depth correction needs Optical mode; Legacy replays the original depth.')
         return _render_legacy(images, depth, **common)
     if lens_mode != 'optical': raise ValueError('Lens mode must be legacy or optical.')
     from .optical import render as optical_render
     return optical_render(images, depth, aperture=aperture, focal_length_mm=focal_length_mm,
                           sensor_width_mm=sensor_width_mm, near_m=near_m, far_m=far_m,
-                          depth_smoothing=depth_smoothing, breathing=breathing, **common)
+                          depth_smoothing=depth_smoothing, breathing=breathing, depth_nudge=depth_nudge, **common)
 
 
 def detect_beats(audio, sample_rate, fps=25):

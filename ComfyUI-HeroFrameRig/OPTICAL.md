@@ -1,9 +1,11 @@
 # Optical mode — local candidate for Brief 43
 
 Optical is explicitly selected with `lens_mode="optical"`. The default of the
-existing renderer, node and older recipe paths stays `legacy`. No public app or
-Playground default is switched by this Part 1 change. Artist acceptance and a
-live cpu-basic benchmark are pending.
+renderer, node and older recipe paths stays `legacy`. New clip sessions in the
+locally staged app start with Optical / Cinematic. No public deployment has
+changed. Maxwell selected Optical on seven of eight Part 1 clips; Walkie's
+truck needs a depth correction. That correction still needs visual acceptance,
+and a live cpu-basic benchmark is pending.
 
 The app adapter and ComfyUI node import the same implementation in `hfr_core`.
 `optical.py` is part of that shared package; it is not a second app renderer.
@@ -70,9 +72,52 @@ The Legacy function body, schedule, colour treatment and RNG remain unchanged.
 New Comfy node widgets are appended after the existing optional widgets, so
 old positional widget values retain their meanings.
 
+## App presets and depth correction (Part 2)
+
+One tap changes both aperture and the time at which focus arrives:
+
+| Preset | Aperture | Arrival in the clip |
+|---|---|---|
+| Subtle | f/5.6 | 85% |
+| Cinematic | f/2.8 | 70% |
+| Dramatic | f/1.4 | 60% |
+
+The exact numeric values, lens mode and curve are saved. A custom aperture or
+timing does not acquire a preset name. Existing imported recipes retain their
+original mode and settings. Optical can be switched back to Legacy.
+
+The app warns when the two endpoint taps differ by less than 0.12 in normalized
+estimated depth. This is a heuristic, not a measured scene distance. After a
+depth analysis, further adjustments reuse the cached depth. Head-follow mode
+can still require its own subject-analysis job; the job label remains explicit.
+
+Under **More controls → Adjust a depth region**, tap a region on the Start or
+End preview, then move **Farther ← depth nudge → nearer**. Negative values make
+it farther; positive values make it nearer. The amber preview shows an estimated
+depth selection inside a feathered screen-space ellipse. Adjust area size or
+depth range to keep nearby subjects out. One correction is supported at a time.
+
+This is **not object tracking or segmentation**. The screen-space region stays
+fixed while its depth gate is evaluated in every frame; subjects at the same
+estimated depth may also be affected. The preview uses the original endpoint
+depth; rendering applies the saved correction after temporal and edge cleanup.
+Inspect the full clip for moving-edge spill. Zero or Clear restores the original
+depth treatment. Source RGB and the original depth cache are never edited.
+
+Recipes store `depth_nudge` (position, amount, radius, depth band, anchor frame
+and resolved anchor depth), the original depth and the final focus curve. The
+node receives the same correction through the appended `depth_nudge_json`
+widget. Apply it once, after depth preparation; do not export pre-nudged depth.
+Changing a preset or correction invalidates the displayed directed result until
+it is rendered again. Changing only the preview frame does not invalidate it.
+
+Original cached relative-depth recipes at 24 or 25 fps can be reopened without
+a new analysis. Neither a preview, a preset nor a saved-recipe download creates
+a backend job.
+
 ## Validation
 
-Run `python -m unittest tests.test_optical_focus tests.test_edge_cleanup -v` from
+Run `python -m unittest discover -s tests -v` from
 the app repository. Tests cover radiometric conservation, disc shape, sharp
 foreground isolation, soft foreground coverage, aperture response, temporal
 filter gating, timing, explicit-curve replay, node parity, saved widget order,

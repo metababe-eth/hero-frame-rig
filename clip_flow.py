@@ -5,9 +5,13 @@ import clip_focus
 
 MIDDLE=[('Follow the face',clip_focus.HEAD),("Follow what's closest",clip_focus.FOLLOW),('Stay put',clip_focus.HOLD)]
 
-def aperture(blur):
-    value=float(blur)
+def aperture(blur_value,saved_aperture=None):
+    value=float(blur_value)
     if not 0<=value<=100:raise ValueError('Blur must be between Subtle and Strong.')
+    # Keep exact recipe/preset values when their displayed slider position has
+    # only been rounded by the UI. A real slider step still changes aperture.
+    if saved_aperture is not None and 1.4<=float(saved_aperture)<=5.6:
+        if abs(value-round(blur(saved_aperture),1))<1e-8:return float(saved_aperture)
     return round(5.6-4.2*value/100,8)
 
 def blur(aperture_value):
@@ -54,6 +58,6 @@ def metadata(state):
 def fresh_study(recipe):
     state=clip_focus.import_recipe(recipe)
     state.update(points=[None,None],focused=None,plan=None,study='Arrival')
-    state['settings']={'middle':clip_focus.HEAD,'landing':85,'f_stop':1.4,'guide':60,'edge_cleanup':.5}
+    state['settings']=clip_focus.default_settings()
     clip_focus.save(state)
     return state

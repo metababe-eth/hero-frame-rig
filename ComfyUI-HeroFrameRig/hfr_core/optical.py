@@ -93,14 +93,17 @@ def _edge_depth(depth, image, strength):
     return depth+(total/weight-depth)*strength
 
 
-def prepare_depth(depth, images, smoothing=.5, cleanup=.5):
+def prepare_depth(depth, images, smoothing=.5, cleanup=.5, depth_nudge=None):
     """Exact preprocessing shared by rendering and recipe/study planning."""
     d=smooth_depth(depth_array(depth,tuple(images.shape[:3])),images,smoothing)
-    if not cleanup: return d
-    for i in range(len(d)):
-        image=torch.as_tensor(images[i]).detach().to('cpu',torch.float32).permute(2,0,1)[None]
-        if images.dtype in (torch.uint8,np.dtype('uint8')): image=image/255
-        d[i]=_edge_depth(torch.from_numpy(d[i])[None,None],image,cleanup)[0,0].numpy()
+    if cleanup:
+        for i in range(len(d)):
+            image=torch.as_tensor(images[i]).detach().to('cpu',torch.float32).permute(2,0,1)[None]
+            if images.dtype in (torch.uint8,np.dtype('uint8')): image=image/255
+            d[i]=_edge_depth(torch.from_numpy(d[i])[None,None],image,cleanup)[0,0].numpy()
+    if depth_nudge is not None:
+        from .directing import nudge_depth
+        d=nudge_depth(d,depth_nudge)
     return d
 
 
@@ -212,7 +215,7 @@ def _frame(colour,depth,focus,params,strength,cleanup):
 @torch.inference_mode()
 def render(images,depth,start_x=.25,start_y=.45,end_x=.75,end_y=.55,
            blur_strength=50,arrival=7/9,in_between='stay',spotlight=0,seed=7,
-           focus_curve=None,head_targets=None,progress=None,edge_cleanup=.5,**optics):
+           focus_curve=None,head_targets=None,progress=None,edge_cleanup=.5,depth_nudge=None,**optics):
     params=settings(**optics)
     if not isinstance(images,torch.Tensor): images=torch.as_tensor(images)
     if images.ndim!=4 or images.shape[-1]!=3: raise ValueError('Images must be NHWC RGB.')
@@ -225,7 +228,7 @@ def render(images,depth,start_x=.25,start_y=.45,end_x=.75,end_y=.55,
     # Validate before smoothing, including floating-point image range.
     if not torch.isfinite(images).all() or images.min()<0 or images.max()>(255 if images.dtype==torch.uint8 else 1):
         raise ValueError('Images must be finite RGB values in 0–1, or uint8.')
-    d=prepare_depth(depth,images,params['depth_smoothing'],cleanup)
+    d=prepare_depth(depth,images,params['depth_smoothing'],cleanup,depth_nudge)
     if focus_curve is None:
         focus_curve=make_plan(d,start_x,start_y,end_x,end_y,strength,arrival,in_between,head_targets)['render_curve']
     curve=np.asarray(focus_curve,dtype=np.float64)
