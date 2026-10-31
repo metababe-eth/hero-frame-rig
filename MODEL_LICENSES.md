@@ -1,9 +1,9 @@
 # Model and runtime licence record
 
-Prepared for Brief 33 from linked primary cards/licences. This records exact named
+This record uses linked primary cards/licences and identifies exact named
 variants; Cloud worker revisions and weight bytes have not been independently
 audited. Install/download models under their own terms; app licences do not
-relicense them. Nothing in this document is a release approval.
+relicense them.
 
 ## App runtime and optional generation dependencies
 
@@ -41,16 +41,15 @@ compositing and no model, depth inference, tracking or Cloud job.
 
 Primary model cards and upstream licences checked 26 October 2026. The LTX licence
 has custom use and distribution conditions; it is not an Apache/MIT licence.
-Model terms do not grant rights to Maxwell's artwork or separate soundtrack media.
+Model terms do not grant rights to Max Krane's artwork or separate soundtrack media.
 
 Other installed dependencies include Gradio (Apache-2.0), PyTorch (BSD-style),
 NumPy (BSD-3-Clause), Pillow (HPND), OpenEXR (BSD-3-Clause), OpenCV (Apache-2.0)
 and HTTPX (BSD-3-Clause). FFmpeg licensing depends on the installed build; no
 FFmpeg executable is distributed. Consult the installed distributions' notices.
 
-Maxwell retains his art and creative direction. CC0 source references do not
-automatically make every remix or every asset in an archive CC0. Historical private
-Space test assets are not approved for public release by this code change.
+Max Krane retains his art and creative direction. CC0 source references do not
+automatically make every remix or every asset in an archive CC0.
 
 FLUX and Black Forest Labs names identify third-party models; they do not imply
 endorsement of Hero Frame Rig. Model weight terms are separate from the app's

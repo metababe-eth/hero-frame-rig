@@ -1,11 +1,10 @@
-# Optical mode — local candidate for Brief 43
+# Optical focus
 
 Optical is explicitly selected with `lens_mode="optical"`. The default of the
-renderer, node and older recipe paths stays `legacy`. New clip sessions in the
-locally staged app start with Optical / Cinematic. No public deployment has
-changed. Maxwell selected Optical on all eight showcase clips, including the
-narrower Walkie truck correction accepted in review 43B. A live cpu-basic
-benchmark is pending. Pack release is 3.0.0; the existing Legacy renderer and
+renderer, node and older recipe paths stays `legacy`. New interactive clip
+sessions start with Optical / Cinematic. Optical is the default on all eight
+Playground showcase clips, including the Walkie clip's saved truck-depth
+correction. Pack release is 3.0.0; the existing Legacy renderer and
 Optical algorithm identifiers are retained for recipe provenance.
 
 The app adapter and ComfyUI node import the same implementation in `hfr_core`.
@@ -73,7 +72,7 @@ The Legacy function body, schedule, colour treatment and RNG remain unchanged.
 New Comfy node widgets are appended after the existing optional widgets, so
 old positional widget values retain their meanings.
 
-## App presets and depth correction (Part 2)
+## App presets and depth correction
 
 One tap changes both aperture and the time at which focus arrives:
 

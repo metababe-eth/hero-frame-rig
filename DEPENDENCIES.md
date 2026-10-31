@@ -9,11 +9,9 @@ historical. No new Python dependency or packaged model weight is added.
 
 # Still-workflow dependencies and replay status
 
-Audit and desktop replay: 2026-10-12–13, America/Chicago. Initial source review: `740392f22e6c88279c6ed57abdad02b49ea8da98`; initial replay used recipes exported by application `a17d580e`. Current private deployment: `aab86d0865bb4c607f27727bd534c8cf19659b79`. Scope: the still-workflow source inventory, app preprocessing, and executed saved-take replay. The initial source audit installed nothing; the first replay phase installed an isolated Windows CPU runtime and used no model weights or Cloud jobs. The Oct 13 follow-up ran the clean installer and exactly two Cloud **Develop** jobs for new CPU-grain Film/CineStill references, followed by local replay. It ran no Shoot, Scan or animation jobs and downloaded no model weights; billed credits were unavailable. Animation is separately documented in `ANIMATION_HANDOFF.md`.
+Audit and desktop replay: 2026-10-12–13, America/Chicago. Initial source review: `740392f22e6c88279c6ed57abdad02b49ea8da98`; initial replay used recipes exported by application `a17d580e`. Deployment measured in that audit: `aab86d0865bb4c607f27727bd534c8cf19659b79`. Scope: the still-workflow source inventory, app preprocessing, and executed saved-take replay. The initial source audit installed nothing; the first replay phase installed an isolated Windows CPU runtime and used no model weights or Cloud jobs. The Oct 13 follow-up ran the clean installer and exactly two Cloud **Develop** jobs for new CPU-grain Film/CineStill references, followed by local replay. It ran no Shoot, Scan or animation jobs and downloaded no model weights; billed credits were unavailable. Animation is separately documented in `ANIMATION_HANDOFF.md`.
 
 **Clean installation and CPU still-look replay have execution evidence.** See [DESKTOP_REPLAY.md](DESKTOP_REPLAY.md). Untouched Registry Radiance 2.3.3 with ComfyUI `f9c6185d` reproduces the initial NOLA Digital take within 1/255 at 19 pixels. New layered NOLA Film/CineStill takes explicitly record CPU grain and replay within 1/255 at 304/348 pixels respectively (900×1600 RGB; MAE 0.0000708333/0.0000805556 on the 0–255 scale). These are measured near-matches, not pixel-exact results. Legacy Product GPU-grain Film/CineStill takes still fail the comparison tolerance, with maxima of 16/255 and 15/255; their cause is unresolved. Cloud model hashes and worker revisions remain unknown; full local generation/scan/animation are outside this verification.
-
-**Private until Maxwell authorizes publication.** This dependency inventory and successful replay checks do not authorize a public Space, repository mirror or competition submission.
 
 **Correction to the earlier blur hypothesis:** source-compatible Registry 2.3.3 actually reproduces the saved pixels despite using Gaussian blur. The previous claim that the Cloud takes proved a true disc kernel was unsupported. The September Git candidate below is not the Registry artifact; pin the archive hash in DESKTOP_REPLAY.md, not a version label.
 
@@ -139,5 +137,5 @@ package, with manual neutral controls except equal RGB gain and saturation.
 No external preset or reference input is used. Core `ImageToMask` and unclamped
 `ImageCompositeMasked` blend each saved guide mask. Guide 0 adds no nodes.
 Pinned local grading/compositing checks preserve HDR and the exact zero-mask
-pixels; Cloud execution of this new branch awaits the approved bar comparisons.
+pixels; those checks alone do not verify a guided Cloud output.
 No new models or packages are required.

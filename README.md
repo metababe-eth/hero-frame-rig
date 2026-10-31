@@ -37,7 +37,7 @@ chip; we have not tested its output quality or ruled out its post-generation too
   plus **More controls → Adjust a depth region** for a reversible Nearer/Farther
   nudge. Its feathered region stays at its screen position; it does not track
   objects. The recipe saves the original depth and exact correction separately.
-- **Playground:** the same Optical core, eight approved clips, preset buttons
+- **Playground:** the same Optical core, eight showcase clips, preset buttons
   and synchronized Original | Focus playback, stacked on phones.
 
 ![Focus presets and depth guidance in the full app](https://huggingface.co/spaces/metababa/hero-frame-rig-playground/resolve/main/media/docs/release-optical.jpg)
@@ -272,10 +272,9 @@ The renderer is CPU-bound and large batches use RAM. No new model weights are ad
 ## Credits and licences
 
 App code: [Apache-2.0](LICENSE). Standalone focus pack:
-[MIT](ComfyUI-HeroFrameRig/LICENSE). Maxwell's artwork, source footage, portraits,
+[MIT](ComfyUI-HeroFrameRig/LICENSE). Max Krane's artwork, source footage, portraits,
 recipes containing his media and demo exports are his creative material; neither
 code licence grants blanket reuse rights to that media or third-party references.
-Only media explicitly selected by Maxwell should be published.
 
 | Model or dependency | Licence | Role |
 | --- | --- | --- |
@@ -285,7 +284,7 @@ Only media explicitly selected by Maxwell should be published.
 | [FLUX.2 Klein 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) | Apache-2.0 | Executed still engine |
 | [LTX-2.3](https://huggingface.co/Lightricks/LTX-2.3/blob/main/LICENSE) | LTX-2 Community License Agreement, custom terms | Core motion model |
 | [Depth Anything 3 Metric Large](https://huggingface.co/depth-anything/DA3METRIC-LARGE) | Apache-2.0 | Estimated depth |
-| [ACE-Step 1.5 XL Turbo](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo) | MIT | Locally assembled demo soundtrack; not an app generation button |
+| [ACE-Step 1.5 XL Turbo](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo) | MIT | Earlier soundtrack study; not used in the locked demo or exposed as an app generation button |
 | [comfy-sdk](https://github.com/Comfy-Org/comfy-python-sdk/blob/main/LICENSE) | MIT | Local/Cloud workflow client |
 | [Comfy workflow templates](https://github.com/Comfy-Org/workflow_templates/blob/main/LICENSE) | MIT | Adapted graph sources; [notice retained](THIRD_PARTY_NOTICES.md) |
 

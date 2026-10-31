@@ -1,7 +1,6 @@
-# Private desktop recipe replay
+# Saved still recipes: desktop replay
 
-Keep this project private until Maxwell authorizes public submission. This document
-describes replaying an exported **saved take**, with its existing pixels and maps.
+This document describes replaying an exported **saved take**, with its existing pixels and maps.
 It does not run FLUX, estimate depth again, animate, or connect to Comfy Cloud.
 
 ## What has actually run
@@ -16,7 +15,7 @@ that prompt's SaveImage result, not copied from the recipe.
 - Maximum channel error: **1/255**; mean absolute error: **0.000004398/255**.
 - 2.11 seconds submission-to-retrieval on this machine; core execution about 1.13 s.
 - No Cloud jobs, model downloads, or credentials were used for desktop replay.
-- This is numerical near-parity, not byte/pixel identity or Maxwell's visual approval.
+- This is numerical near-parity, not byte/pixel identity or a perceptual quality score.
 
 The shipped installer then created a second clean environment. Its generated launcher
 and `replay_desktop.py` executed the NOLA Digital recipe and two new layered look
@@ -40,10 +39,9 @@ and 15 respectively). Their exact cause remains unresolved; the CPU change does
 not retroactively make those old recipes pass. A Product Digital take did pass at
 1/255. This evidence supports the tested recipes and runtime, not every input.
 
-Execution records and further coverage are in
-[`tests/desktop-replay-20261012/DESKTOP_REPLAY_REPORT.md`](tests/desktop-replay-20261012/DESKTOP_REPLAY_REPORT.md).
-Full application generation/analysis and animation remain separate unverified local
-workflows. The live Gradio app still uses Cloud for Shoot/Scan/Develop.
+These historical measurements cover saved still recipes on the pinned environment
+below. They do not establish full application generation, analysis or animation
+performance. Historical test media is not bundled in this code repository.
 
 ## Exact source and environment
 
@@ -68,7 +66,7 @@ interchangeable. Do not substitute the Git version label or latest Radiance.
 
 ## Fresh setup
 
-From this private repository checkout, with 64-bit Python 3.11 and Git available:
+From this repository checkout, with 64-bit Python 3.11 and Git available:
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\setup_desktop_replay.ps1 -Destination .\desktop-replay -Python python
@@ -95,10 +93,8 @@ With the local server running, from the repository checkout:
 .\desktop-replay\.venv\Scripts\python.exe .\replay_desktop.py .\hero_frame_recipe.zip --server http://127.0.0.1:8190 --output .\replay-evidence
 ```
 
-The private tested seven-take example is
-[`tests/desktop-replay-20261012/cloud-cpu-looks/cinestill.zip`](tests/desktop-replay-20261012/cloud-cpu-looks/cinestill.zip).
-Its selected take 7 is CineStill; take 6 is Film. Treat this as test media until
-Maxwell approves release assets.
+The historical seven-take example selected CineStill take 7; take 6 was Film.
+That archive is not bundled. Supply your own exported recipe ZIP to the command above.
 
 Add `--take 4` to choose another take or use a legacy recipe without `selected_take`.
 The output directory must be new. This command really executes local processing:
